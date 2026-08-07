@@ -41,60 +41,60 @@
 
 .chrono-ext-status-timeline {
   display: flex;
-  flex-direction: column;
-  gap: 4px;
+  flex-direction: row;
+  align-items: center;
+  gap: 16px;
   padding: 2px 0;
+  width: 100%;
+  overflow-x: auto;
+}
+/* Hide scrollbar for cleaner look but keep scrollable if needed */
+.chrono-ext-status-timeline::-webkit-scrollbar {
+  display: none;
 }
 
 .chrono-ext-log-entry {
   display: flex;
-  align-items: flex-start;
+  align-items: center;
   gap: 6px;
   position: relative;
-  padding-left: 14px;
-  min-height: 18px;
+  flex: 0 1 auto;
+  min-width: 0;
 }
 
-/* Vertical connector line */
-.chrono-ext-log-entry:not(:last-child)::before {
-  content: "";
+/* Horizontal connector arrow between entries */
+.chrono-ext-log-entry:not(:last-child)::after {
+  content: "›";
   position: absolute;
-  left: 5px;
-  top: 12px;
-  bottom: -8px;
-  width: 1px;
-  background: rgba(0, 0, 0, 0.12);
+  right: -11px;
+  top: 50%;
+  transform: translateY(-50%);
+  color: rgba(0, 0, 0, 0.25);
+  font-size: 14px;
+  line-height: 1;
 }
 
 /* Dot on the timeline */
 .chrono-ext-log-dot {
-  position: absolute;
-  left: 2px;
-  top: 4px;
+  display: inline-block;
   width: 8px;
   height: 8px;
   border-radius: 50%;
   flex-shrink: 0;
-  z-index: 1;
 }
 
 /* First entry (most recent) is larger */
 .chrono-ext-log-entry:first-child .chrono-ext-log-dot {
   width: 10px;
   height: 10px;
-  left: 1px;
-  top: 3px;
 }
 
 .chrono-ext-log-content {
   display: flex;
   flex-direction: row;
   align-items: center;
-  justify-content: space-between;
-  gap: 12px;
+  gap: 6px;
   min-width: 0;
-  flex: 1;
-  padding-right: 8px;
 }
 
 .chrono-ext-log-status {
@@ -105,12 +105,13 @@
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
+  max-width: 160px; /* limits width so 3 logs fit horizontally */
 }
 
 /* First entry text is bolder */
 .chrono-ext-log-entry:first-child .chrono-ext-log-status {
   font-weight: 600;
-  font-size: 12px;
+  color: rgba(0, 0, 0, 0.95);
 }
 
 /* Older entries are slightly muted */
@@ -120,10 +121,12 @@
 }
 
 .chrono-ext-log-time {
-  font-size: 11px;
-  color: rgba(0, 0, 0, 0.45);
+  font-size: 10px;
+  color: rgba(0, 0, 0, 0.40);
   white-space: nowrap;
-  flex-shrink: 0;
+  letter-spacing: -0.2px;
+  transform: scale(0.85);
+  transform-origin: left center;
 }
 
 /* ── Spinner (loading state) ───────────────────────────────── */
@@ -251,5 +254,70 @@
   opacity: 0;
   transition: opacity 0.3s ease;
   background: transparent;
+}
+
+/* ── Override Ant Table defaults to fix scrolling and column widths ── */
+
+/* Force the table body to expand so users don't have to scroll vertically for just 2 rows */
+.ant-modal-body .ant-table-body,
+.chrono-iframe-overlay .ant-table-body {
+  max-height: 60vh !important;
+}
+
+/* Widen the 2nd column (Reference Number) so statuses don't get crushed */
+.ant-table-header colgroup col:nth-child(2),
+.ant-table-body colgroup col:nth-child(2) {
+  width: 500px !important;
+  min-width: 500px !important;
+}
+
+/* ── Verify Completed Trips Button & Badge ──────────────────────── */
+
+.chrono-ext-verify-btn {
+  margin-left: 8px;
+  background-color: #f6ffed !important;
+  border-color: #b7eb8f !important;
+  color: #52c41a !important;
+  font-weight: 500;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  height: 24px;
+  padding: 0 7px;
+  border-radius: 4px;
+  cursor: pointer;
+  border: 1px solid;
+  transition: all 0.3s;
+}
+
+.chrono-ext-verify-btn:hover {
+  background-color: #d9f7be !important;
+}
+
+.chrono-ext-verify-btn.is-loading {
+  opacity: 0.7;
+  pointer-events: none;
+}
+.chrono-ext-verify-btn.is-loading .chrono-ext-spinner {
+  width: 12px;
+  height: 12px;
+  border-width: 2px;
+}
+
+.chrono-ext-rider-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background-color: #f6ffed;
+  border: 1px solid #b7eb8f;
+  color: #52c41a;
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  font-size: 10px;
+  font-weight: bold;
+  margin-right: 6px;
+  vertical-align: middle;
+  flex-shrink: 0;
 }
 

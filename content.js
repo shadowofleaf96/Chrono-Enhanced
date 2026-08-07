@@ -10,9 +10,9 @@
 
   // ── Config ────────────────────────────────────────────────
   const BASE_URL = "https://cross.chronodiali.ma/ops/details/";
-  const IFRAME_TIMEOUT = 15000;        // ms – max wait for iframe to render
+  const IFRAME_TIMEOUT = 35000;        // ms – max wait for iframe to render
   const IFRAME_POLL = 300;             // ms – how often to poll iframe DOM
-  const MAX_CONCURRENT = 3;            // max simultaneous iframe fetches
+  const MAX_CONCURRENT = 1;            // max simultaneous iframe fetches
   const ATTR_PROCESSED = "data-chrono-status-processed";
 
   // ── Status cache (CN → array of {status, color, time}) ────
@@ -110,7 +110,13 @@
               '.ant-timeline-item'
             );
 
-            if (timelineItems.length === 0) return; // not rendered yet
+            if (timelineItems.length === 0) {
+              // Check if it explicitly rendered an empty state (e.g. brand new parcel)
+              if (iframeDoc.querySelector('.ant-empty')) {
+                finish([{ status: "No Data", color: "#d9d9d9", time: "" }]);
+              }
+              return; // not rendered yet
+            }
 
             const entries = [];
             for (let i = 0; i < Math.min(timelineItems.length, LOG_ENTRIES_COUNT); i++) {
@@ -229,7 +235,11 @@
 
       const statusEl = document.createElement("span");
       statusEl.className = "chrono-ext-log-status";
-      statusEl.textContent = entry.status;
+      statusEl.title = entry.status; // hover to see full text including reason
+      
+      // Shorten status by removing text inside parentheses, e.g., "(Reason - ...)"
+      let shortStatus = entry.status.replace(/\s*\(.*?\)/g, '').trim();
+      statusEl.textContent = shortStatus;
       content.appendChild(statusEl);
 
       if (entry.time) {
@@ -287,82 +297,9 @@
     }
   }
 
-  function ensureStatusHeader(modal) {
-    const headerRow = modal.querySelector(".ant-table-thead tr");
-    if (!headerRow) return;
-
-    let th = headerRow.querySelector(".chrono-ext-status-header");
-    if (!th) {
-      th = document.createElement("th");
-      th.className = "ant-table-cell chrono-ext-status-header";
-      th.style.width = "650px";
-      th.innerHTML = `
-        <div style="width:100%;white-space:nowrap;text-overflow:ellipsis;overflow:hidden;">
-          Status (Last ${LOG_ENTRIES_COUNT})
-        </div>
-      `;
-    }
-
-    // Find Action column header among native cells
-    const ths = Array.from(
-      headerRow.querySelectorAll("th.ant-table-cell:not(.chrono-ext-status-header)")
-    );
-    let actionTh = null;
-    for (const item of ths) {
-      if (item.textContent.trim().toLowerCase().includes("action")) {
-        actionTh = item;
-        break;
-      }
-    }
-
-    // Ensure status header th is placed right before actionTh
-    if (actionTh) {
-      if (th.nextElementSibling !== actionTh) {
-        headerRow.insertBefore(th, actionTh);
-      }
-    } else {
-      const scrollbarCell = headerRow.querySelector("th.ant-table-cell-scrollbar");
-      if (scrollbarCell && th.nextElementSibling !== scrollbarCell) {
-        headerRow.insertBefore(th, scrollbarCell);
-      } else if (!scrollbarCell && headerRow.lastElementChild !== th) {
-        headerRow.appendChild(th);
-      }
-    }
-
-    // Explicitly adjust widths of th elements in order
-    const allThs = headerRow.querySelectorAll(
-      "th.ant-table-cell:not(.ant-table-cell-scrollbar)"
-    );
-    if (allThs.length >= 4) {
-      allThs[0].style.width = "80px";   // S.No.
-      allThs[1].style.width = "220px";  // CN No.
-      // allThs[2] is Status (650px)
-      allThs[3].style.width = "100px";  // Action
-    }
-
-    // Colgroup for header table
-    const headerCG = modal.querySelector(".ant-table-header table colgroup");
-    if (headerCG && headerCG.children.length !== 5) {
-      headerCG.innerHTML = `
-        <col style="width: 80px;">
-        <col style="width: 220px;">
-        <col style="width: 650px;">
-        <col style="width: 100px;">
-        <col style="width: 15px;">
-      `;
-    }
-
-    // Colgroup for body table
-    const bodyCG = modal.querySelector(".ant-table-body table colgroup");
-    if (bodyCG && bodyCG.children.length !== 4) {
-      bodyCG.innerHTML = `
-        <col style="width: 80px;">
-        <col style="width: 220px;">
-        <col style="width: 650px;">
-        <col style="width: 100px;">
-      `;
-    }
-  }
+  // We intentionally do NOT modify the table headers or colgroups anymore.
+  // Modifying React-controlled columns (<th>, <colgroup>) crashes the app 
+  // when it tries to re-render, preventing new scans from appearing.
 
   // ── Row processing ────────────────────────────────────────
 
@@ -371,67 +308,82 @@
     if (!tbody) return;
 
     for (const row of tbody.querySelectorAll("tr")) {
-      // Handle measure row
-      if (row.classList.contains("ant-table-measure-row")) {
-        const tds = row.querySelectorAll("td");
-        if (tds.length === 3) {
-          const td = document.createElement("td");
-          td.style.cssText = "padding:0;border:0;height:0;";
-          td.innerHTML = '<div style="height:0;overflow:hidden;">&nbsp;</div>';
-          row.insertBefore(td, tds[2]);
-        }
+      if (row.classList.contains("ant-table-measure-row") || row.classList.contains("ant-table-placeholder")) {
         continue;
       }
 
-      // Handle placeholder row
-      if (row.classList.contains("ant-table-placeholder")) {
-        const td = row.querySelector("td");
-        if (td && td.getAttribute("colspan") !== "4") {
-          td.setAttribute("colspan", "4");
-        }
-        continue;
-      }
+      const tds = Array.from(row.querySelectorAll("td.ant-table-cell"));
+      if (tds.length < 2) continue;
 
-      // Get native cells excluding our injected status cell
-      let statusTd = row.querySelector(".chrono-ext-status-cell");
-      const otherCells = Array.from(
-        row.querySelectorAll("td.ant-table-cell:not(.chrono-ext-status-cell)")
-      );
-
-      if (otherCells.length < 2) continue;
-
-      const cnCode = otherCells[1]?.textContent?.trim();
+      const cnTd = tds[1];
+      
+      // Don't read our own injected text if we are re-processing
+      // We extract the pure text content of the cell minus our container if it exists
+      const clone = cnTd.cloneNode(true);
+      const existingContainer = clone.querySelector(".chrono-ext-status-container");
+      if (existingContainer) existingContainer.remove();
+      
+      const rawText = clone.textContent || "";
+      const cnCodeMatch = rawText.match(/[a-zA-Z0-9_-]+/);
+      const cnCode = cnCodeMatch ? cnCodeMatch[0] : "";
       if (!cnCode) continue;
 
-      // Identify Action cell (cell index 2)
-      const actionTd = otherCells.length >= 3 ? otherCells[2] : null;
-
-      // Create status cell if not existing
-      const isNew = !statusTd;
-      if (isNew) {
-        statusTd = document.createElement("td");
-        statusTd.className = "ant-table-cell chrono-ext-status-cell";
-        statusTd.appendChild(createLoadingBadge());
+      // Detect if React recycled this row for a different parcel
+      const currentCn = row.getAttribute("data-chrono-cn");
+      if (currentCn !== cnCode) {
+        row.setAttribute("data-chrono-cn", cnCode);
+        row.removeAttribute(ATTR_PROCESSED);
       }
 
-      // Ensure statusTd is always positioned right before actionTd
-      if (actionTd) {
-        if (statusTd.nextElementSibling !== actionTd) {
-          row.insertBefore(statusTd, actionTd);
-        }
-      } else {
-        if (row.lastElementChild !== statusTd) {
-          row.appendChild(statusTd);
-        }
+      // Check for our status container inside the cell
+      let statusContainer = cnTd.querySelector(".chrono-ext-status-container");
+      let newlyCreated = false;
+      
+      if (!statusContainer) {
+        // Ensure the cell uses flex layout so the CN number and our timeline sit side-by-side
+        cnTd.style.display = "flex";
+        cnTd.style.alignItems = "center";
+        cnTd.style.justifyContent = "space-between";
+        cnTd.style.gap = "16px";
+        cnTd.style.minWidth = "600px"; // give it room to breathe
+
+        statusContainer = document.createElement("div");
+        statusContainer.className = "chrono-ext-status-container";
+        // We use flex: 1 here so it takes remaining space without pushing the CN text out
+        statusContainer.style.flex = "1";
+        statusContainer.style.minWidth = "0";
+        cnTd.appendChild(statusContainer);
+        newlyCreated = true;
       }
 
-      // Fetch and update status if new or unprocessed
-      if (isNew || !row.hasAttribute(ATTR_PROCESSED)) {
-        row.setAttribute(ATTR_PROCESSED, "true");
-        fetchParcelStatus(cnCode).then((entries) => {
-          statusTd.innerHTML = "";
-          statusTd.appendChild(createStatusTimeline(entries));
-        });
+      // If we just recreated the container (due to React re-render) OR it's a completely new row
+      if (newlyCreated || !row.hasAttribute(ATTR_PROCESSED)) {
+        statusContainer.innerHTML = "";
+        
+        if (statusCache.has(cnCode)) {
+          // Instantly restore from cache if React wiped it out
+          statusContainer.appendChild(createStatusTimeline(statusCache.get(cnCode)));
+          row.setAttribute(ATTR_PROCESSED, "true");
+        } else {
+          // Show loading state
+          statusContainer.appendChild(createLoadingBadge());
+          
+          // Only trigger a new fetch if one hasn't been started for this row
+          if (!row.hasAttribute(ATTR_PROCESSED)) {
+            row.setAttribute(ATTR_PROCESSED, "true");
+            
+            fetchParcelStatus(cnCode).then((entries) => {
+              // Verify this row is still showing the same CN code before updating
+              if (row.getAttribute("data-chrono-cn") === cnCode) {
+                let currentContainer = row.querySelector(".chrono-ext-status-container");
+                if (currentContainer) {
+                  currentContainer.innerHTML = "";
+                  currentContainer.appendChild(createStatusTimeline(entries));
+                }
+              }
+            });
+          }
+        }
       }
     }
   }
@@ -631,6 +583,203 @@
     }
   }
 
+  // ── Verify Completed Trips (Rider List) ─────────────────────
+
+  function ensureVerifyCompletedButton() {
+    if (!location.pathname.includes("/ops/reconciliation/rider-list")) return;
+
+    // Find the Reset All button to place ours next to it
+    const buttons = Array.from(document.querySelectorAll('button'));
+    const resetBtn = buttons.find(b => b.textContent.trim() === 'Reset All');
+    
+    if (resetBtn && !document.querySelector('.chrono-ext-verify-btn')) {
+      const container = resetBtn.parentElement;
+      const verifyBtn = document.createElement('button');
+      
+      // Copy classes for consistent sizing, then add our custom class
+      verifyBtn.className = resetBtn.className + " chrono-ext-verify-btn";
+      verifyBtn.innerHTML = `
+        <span class="chrono-ext-spinner" style="display:none;"></span>
+        <span>Verify Completed Trips</span>
+      `;
+      
+      // Insert right after the reset button
+      if (resetBtn.nextSibling) {
+        container.insertBefore(verifyBtn, resetBtn.nextSibling);
+      } else {
+        container.appendChild(verifyBtn);
+      }
+
+      verifyBtn.addEventListener('click', async (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        
+        if (verifyBtn.classList.contains('is-loading')) return;
+        
+        verifyBtn.classList.add('is-loading');
+        verifyBtn.querySelector('.chrono-ext-spinner').style.display = 'inline-block';
+        verifyBtn.querySelector('span:not(.chrono-ext-spinner)').textContent = "Fetching...";
+
+        try {
+          const completedRiders = await fetchCompletedRiders();
+          
+          // Apply badges to the Rider List table
+          const tbody = document.querySelector('.ant-table-tbody');
+          if (tbody) {
+            const rows = tbody.querySelectorAll('tr.ant-table-row');
+            let matchCount = 0;
+            rows.forEach(row => {
+              const cells = row.querySelectorAll('td.ant-table-cell');
+              if (cells.length >= 2) {
+                // Rider Name is usually in the 2nd cell in Rider List
+                const riderName = cells[1].textContent.trim();
+                
+                // Case-insensitive match just to be safe
+                const isCompleted = Array.from(completedRiders).some(
+                  r => r.toLowerCase() === riderName.toLowerCase()
+                );
+                
+                if (isCompleted && !cells[1].querySelector('.chrono-ext-rider-badge')) {
+                  const badge = document.createElement('span');
+                  badge.className = 'chrono-ext-rider-badge';
+                  badge.innerHTML = '&#10004;'; // checkmark character
+                  
+                  // Prepend before the name to ensure it's always visible (bypasses overflow:hidden)
+                  const innerDiv = cells[1].querySelector('div');
+                  if (innerDiv) {
+                     innerDiv.style.display = "flex";
+                     innerDiv.style.alignItems = "center";
+                     innerDiv.insertBefore(badge, innerDiv.firstChild);
+                  } else {
+                     cells[1].insertBefore(badge, cells[1].firstChild);
+                  }
+                  matchCount++;
+                }
+              }
+            });
+            verifyBtn.querySelector('span:not(.chrono-ext-spinner)').textContent = `Verified (${matchCount} found)`;
+          } else {
+             verifyBtn.querySelector('span:not(.chrono-ext-spinner)').textContent = "Table not found";
+          }
+        } catch (err) {
+          console.error("[ChronoExt] Error fetching completed riders:", err);
+          verifyBtn.querySelector('span:not(.chrono-ext-spinner)').textContent = "Error fetching";
+        } finally {
+          verifyBtn.classList.remove('is-loading');
+          verifyBtn.querySelector('.chrono-ext-spinner').style.display = 'none';
+          
+          // Reset text after 5 seconds
+          setTimeout(() => {
+             if (!verifyBtn.classList.contains('is-loading')) {
+                verifyBtn.querySelector('span:not(.chrono-ext-spinner)').textContent = "Verify Completed Trips";
+             }
+          }, 5000);
+        }
+      });
+    }
+  }
+
+  function fetchCompletedRiders() {
+    return new Promise((resolve, reject) => {
+      const iframe = document.createElement("iframe");
+      iframe.style.cssText = "position:fixed;top:0;left:0;width:10px;height:10px;opacity:0.01;pointer-events:none;z-index:-9999;";
+      iframe.src = "https://cross.chronodiali.ma/ops/retail/trip-manager";
+      document.body.appendChild(iframe);
+
+      let resolved = false;
+      let tabClicked = false;
+      const completedRiders = new Set();
+
+      function finish(result, isError = false) {
+        if (resolved) return;
+        resolved = true;
+        clearInterval(pollTimer);
+        clearTimeout(timeoutTimer);
+        setTimeout(() => {
+          try { iframe.remove(); } catch (_) {}
+        }, 300);
+        if (isError) reject(result);
+        else resolve(result);
+      }
+
+      const timeoutTimer = setTimeout(() => {
+        finish(new Error("Timeout fetching completed trips"), true);
+      }, 45000);
+
+      let pollTimer = null;
+      iframe.addEventListener("load", () => {
+        let attempts = 0;
+        pollTimer = setInterval(() => {
+          try {
+            attempts++;
+            const iframeDoc = iframe.contentDocument || iframe.contentWindow?.document;
+            if (!iframeDoc) return;
+
+            // 1. Find and click the "Completed" tab
+            if (!tabClicked) {
+              const tabs = iframeDoc.querySelectorAll('.ant-tabs-tab-btn');
+              let found = false;
+              for (const tab of tabs) {
+                if (tab.textContent.includes("Completed")) {
+                  tab.click();
+                  tabClicked = true;
+                  found = true;
+                  break;
+                }
+              }
+              if (!found) {
+                 if (attempts > 30) finish(new Error("Could not find Completed tab"), true);
+                 return;
+              }
+            }
+
+            // 2. Wait for the Completed tab to become active
+            const activeTab = iframeDoc.querySelector('.ant-tabs-tab-active');
+            if (!activeTab || !activeTab.textContent.includes("Completed")) return;
+
+            // 3. Ensure no loading spinner is active
+            const spinning = iframeDoc.querySelector('.ant-spin-spinning');
+            if (spinning) return; // Wait until spinner is gone
+
+            // 4. Find the main table anywhere in the document (Shipsy renders it outside the tab pane)
+            const tbody = iframeDoc.querySelector('.ant-table-tbody');
+            if (!tbody) {
+               return; // Wait for table to load
+            }
+
+            // 5. If table is empty but has ant-empty, just return empty set
+            const empty = iframeDoc.querySelector('.ant-empty');
+            const rows = tbody.querySelectorAll('tr.ant-table-row');
+            
+            if (rows.length === 0) {
+                if (empty) {
+                  finish(completedRiders);
+                }
+                return;
+            }
+
+            // Data is here! Parse it.
+            // 7th column is Rider Name in trip manager
+            rows.forEach(row => {
+               const cells = row.querySelectorAll('td.ant-table-cell');
+               if (cells.length >= 7) {
+                  const riderName = cells[6].textContent.trim();
+                  if (riderName) completedRiders.add(riderName);
+               }
+            });
+
+            // We got the data!
+            finish(completedRiders);
+
+          } catch (err) {
+            console.warn("[ChronoExt] Iframe access error for Trip Manager:", err);
+            // Ignore cross-origin errors during navigation
+          }
+        }, 1000);
+      });
+    });
+  }
+
   // ── Auto-set Filters on Consignments Page ─────────────────
   
   function triggerReactClick(element) {
@@ -756,7 +905,6 @@
     const modal = getScanModal(doc);
     if (!modal) return;
     widenModal(modal);
-    ensureStatusHeader(modal);
     processTableRows(modal);
   }
 
@@ -764,6 +912,7 @@
   const bodyObserver = new MutationObserver(() => {
     checkReconciliationToast();
     ensureInscanButton();
+    ensureVerifyCompletedButton();
     ensureDefaultFilters();
     
     const modal = getScanModal(document);
@@ -783,6 +932,7 @@
   setInterval(() => {
     checkReconciliationToast();
     ensureInscanButton();
+    ensureVerifyCompletedButton();
     ensureDefaultFilters();
     
     const modal = getScanModal(document);
