@@ -24,10 +24,23 @@
   - **Date Type**: Last Event Time
   - **Date Range**: Last 60 days
 
+### ✅ Verify Completed Trips (Rider List)
+- Injects a **Verify Completed Trips** button on the Rider List page (`/ops/reconciliation/rider-list`).
+- Fetches the Trip Manager page in the background to find riders who have finished their trips.
+- Prepend a small `✔` badge next to the rider's name dynamically without breaking table layouts.
+
 ### 🎨 UI & UX Improvements
 - Widens the default scan modals to comfortably fit the new status timelines.
 - Adds loading spinners, visual cues, and error handling for iframe fetches.
 - Ensures smooth operation even on React SPA (Single Page Application) route changes.
+
+## Changelog
+
+### Recent Updates
+- **Feature**: Added "Verify Completed Trips" synchronization on the Rider List page to flag finished riders instantly with a `✔` badge.
+- **Fix**: Redesigned Parcel Status tracking to inject timelines directly *inside* the existing reference cell. This completely prevents React virtual DOM crashes and scrolling bugs that happened when injecting new columns.
+- **Fix**: Resolved an issue where previously scanned parcels would get stuck on "Loading..." when React refreshed the table by instantly restoring timelines from the extension's memory cache.
+- **UI**: Made log times visually smaller and shortened long parenthetical reasons in status text for maximum horizontal space.
 
 ## Installation
 
