@@ -1,0 +1,24 @@
+{
+  "manifest_version": 3,
+  "name": "Chrono Enhanced",
+  "version": "1.0.0",
+  "description": "Enhanced features and tools for Chronodiali operations",
+  "permissions": ["activeTab"],
+  "host_permissions": [
+    "https://cross.chronodiali.ma/*"
+  ],
+  "content_scripts": [
+    {
+      "matches": ["https://cross.chronodiali.ma/ops*"],
+      "js": ["content.js"],
+      "css": ["styles.css"],
+      "run_at": "document_idle",
+      "all_frames": true
+    }
+  ],
+  "icons": {
+    "16": "icons/icon16.png",
+    "48": "icons/icon48.png",
+    "128": "icons/icon128.png"
+  }
+}

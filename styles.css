@@ -1,0 +1,255 @@
+/* ============================================================
+   Chrono Parcel Status — Injected Styles
+   ============================================================ */
+
+/* ── Make the scan modal wider ─────────────────────────────── */
+/* Modal widening is handled programmatically in content.js */
+
+/* ── Status badge (single) ─────────────────────────────────── */
+
+.chrono-ext-status-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 2px 10px;
+  border-radius: 12px;
+  background: rgba(0, 0, 0, 0.04);
+  font-size: 12px;
+  line-height: 1.4;
+  white-space: nowrap;
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.chrono-ext-status-dot {
+  display: inline-block;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+
+.chrono-ext-status-text {
+  text-transform: capitalize;
+  color: rgba(0, 0, 0, 0.85);
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* ── Multi-status timeline (3 recent logs) ─────────────────── */
+
+.chrono-ext-status-timeline {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 2px 0;
+}
+
+.chrono-ext-log-entry {
+  display: flex;
+  align-items: flex-start;
+  gap: 6px;
+  position: relative;
+  padding-left: 14px;
+  min-height: 18px;
+}
+
+/* Vertical connector line */
+.chrono-ext-log-entry:not(:last-child)::before {
+  content: "";
+  position: absolute;
+  left: 5px;
+  top: 12px;
+  bottom: -8px;
+  width: 1px;
+  background: rgba(0, 0, 0, 0.12);
+}
+
+/* Dot on the timeline */
+.chrono-ext-log-dot {
+  position: absolute;
+  left: 2px;
+  top: 4px;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  flex-shrink: 0;
+  z-index: 1;
+}
+
+/* First entry (most recent) is larger */
+.chrono-ext-log-entry:first-child .chrono-ext-log-dot {
+  width: 10px;
+  height: 10px;
+  left: 1px;
+  top: 3px;
+}
+
+.chrono-ext-log-content {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  min-width: 0;
+  flex: 1;
+  padding-right: 8px;
+}
+
+.chrono-ext-log-status {
+  font-size: 12px;
+  font-weight: 500;
+  color: rgba(0, 0, 0, 0.85);
+  text-transform: capitalize;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* First entry text is bolder */
+.chrono-ext-log-entry:first-child .chrono-ext-log-status {
+  font-weight: 600;
+  font-size: 12px;
+}
+
+/* Older entries are slightly muted */
+.chrono-ext-log-entry:not(:first-child) .chrono-ext-log-status {
+  color: rgba(0, 0, 0, 0.55);
+  font-weight: 400;
+}
+
+.chrono-ext-log-time {
+  font-size: 11px;
+  color: rgba(0, 0, 0, 0.45);
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+
+/* ── Spinner (loading state) ───────────────────────────────── */
+
+.chrono-ext-spinner {
+  display: inline-block;
+  width: 12px;
+  height: 12px;
+  border: 2px solid rgba(0, 0, 0, 0.15);
+  border-top-color: #1890ff;
+  border-radius: 50%;
+  animation: chrono-ext-spin 0.6s linear infinite;
+  flex-shrink: 0;
+}
+
+@keyframes chrono-ext-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+/* ── Status header column styling ──────────────────────────── */
+
+.chrono-ext-status-header {
+  font-weight: 500;
+}
+
+.chrono-ext-status-cell {
+  padding: 4px 8px !important;
+  vertical-align: top;
+}
+
+/* ── Error state ───────────────────────────────────────────── */
+
+.chrono-ext-status-badge[data-error="true"] {
+  background: rgba(239, 68, 68, 0.08);
+}
+
+.chrono-ext-status-badge[data-error="true"] .chrono-ext-status-text {
+  color: #ef4444;
+}
+
+/* ── Toast Notification ────────────────────────────────────── */
+.chrono-ext-toast {
+  position: fixed;
+  bottom: 24px;
+  right: 24px;
+  z-index: 999999;
+  background: #fff;
+  border-left: 4px solid #faad14;
+  box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+  border-radius: 4px;
+  padding: 16px 20px;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  animation: chrono-toast-slide-in 0.3s ease-out;
+  transition: opacity 0.3s ease;
+}
+
+.chrono-ext-toast-icon {
+  font-size: 18px;
+}
+
+.chrono-ext-toast-content {
+  font-size: 14px;
+  font-weight: 500;
+  color: rgba(0,0,0,0.85);
+}
+
+.chrono-ext-toast-close {
+  cursor: pointer;
+  font-size: 18px;
+  color: rgba(0,0,0,0.45);
+  line-height: 1;
+  padding-left: 8px;
+}
+.chrono-ext-toast-close:hover {
+  color: rgba(0,0,0,0.85);
+}
+
+@keyframes chrono-toast-slide-in {
+  from {
+    transform: translateX(100%);
+    opacity: 0;
+  }
+  to {
+    transform: translateX(0);
+    opacity: 1;
+  }
+}
+
+/* ── Custom Iframe Modal for Inscan ───────────────────────── */
+.chrono-iframe-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100vw;
+  height: 100vh;
+  z-index: 999999;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.chrono-iframe-loading {
+  position: absolute;
+  background: rgba(255, 255, 255, 0.9);
+  padding: 16px 32px;
+  border-radius: 8px;
+  box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+  font-size: 16px;
+  font-weight: 500;
+  color: #1890ff;
+  z-index: 10;
+}
+
+#chrono-inscan-iframe {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  border: none;
+  opacity: 0;
+  transition: opacity 0.3s ease;
+  background: transparent;
+}
+
