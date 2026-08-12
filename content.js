@@ -12,7 +12,7 @@
   const BASE_URL = "https://cross.chronodiali.ma/ops/details/";
   const IFRAME_TIMEOUT = 35000;        // ms – max wait for iframe to render
   const IFRAME_POLL = 300;             // ms – how often to poll iframe DOM
-  const MAX_CONCURRENT = 1;            // max simultaneous iframe fetches
+  const MAX_CONCURRENT = 4;            // max simultaneous iframe fetches
   const ATTR_PROCESSED = "data-chrono-status-processed";
 
   // ── Status cache (CN → array of {status, color, time}) ────
@@ -130,6 +130,7 @@
               // The status is in the last <p> inside Component-timelineEvent-
               const eventEl = item.querySelector('[class*="Component-timelineEvent-"]');
               let status = "";
+              let fullStatus = "";
               if (eventEl) {
                 const paragraphs = eventEl.querySelectorAll('p');
                 // First p = header (e.g. "Consignment Status"), last = value
@@ -138,12 +139,16 @@
                 } else if (paragraphs.length === 1) {
                   status = paragraphs[0].textContent.trim();
                 }
+                fullStatus = (eventEl.innerText || eventEl.textContent || "").trim().replace(/\n+/g, ' - ');
               }
 
               if (!status) {
                 // Fallback: try getting any text from the content area
                 const contentEl = item.querySelector('.ant-timeline-item-content');
-                if (contentEl) status = contentEl.textContent.trim().substring(0, 50);
+                if (contentEl) {
+                  fullStatus = (contentEl.innerText || contentEl.textContent || "").trim().replace(/\n+/g, ' - ');
+                  status = contentEl.textContent.trim().substring(0, 50);
+                }
               }
 
               // Get dot color from the timeline head
@@ -160,7 +165,8 @@
               }
 
               if (status) {
-                entries.push({ status, color, time });
+                if (!fullStatus) fullStatus = status;
+                entries.push({ status, color, time, fullStatus });
               }
             }
 
@@ -235,11 +241,31 @@
 
       const statusEl = document.createElement("span");
       statusEl.className = "chrono-ext-log-status";
-      statusEl.title = entry.status; // hover to see full text including reason
+      statusEl.title = "Click to toggle full text";
       
       // Shorten status by removing text inside parentheses, e.g., "(Reason - ...)"
       let shortStatus = entry.status.replace(/\s*\(.*?\)/g, '').trim();
+      let fullStatus = entry.fullStatus || entry.status;
       statusEl.textContent = shortStatus;
+
+      let isExpanded = false;
+      row.style.cursor = "pointer";
+      row.title = "Click to toggle full text";
+      
+      row.addEventListener("click", (e) => {
+        e.stopPropagation();
+        e.preventDefault();
+        console.log("[ChronoExt] Status clicked, expanding:", !isExpanded);
+        isExpanded = !isExpanded;
+        if (isExpanded) {
+          statusEl.textContent = fullStatus;
+          statusEl.classList.add("expanded");
+        } else {
+          statusEl.textContent = shortStatus;
+          statusEl.classList.remove("expanded");
+        }
+      });
+
       content.appendChild(statusEl);
 
       if (entry.time) {

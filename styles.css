@@ -106,6 +106,18 @@
   overflow: hidden;
   text-overflow: ellipsis;
   max-width: 160px; /* limits width so 3 logs fit horizontally */
+  cursor: pointer;
+  transition: all 0.3s ease;
+}
+
+.chrono-ext-log-status:hover {
+  color: #1890ff;
+}
+
+.chrono-ext-log-status.expanded {
+  white-space: normal !important;
+  overflow: visible !important;
+  max-width: none !important;
 }
 
 /* First entry text is bolder */
