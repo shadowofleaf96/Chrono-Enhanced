@@ -242,6 +242,7 @@
   display: flex;
   align-items: center;
   justify-content: center;
+  transition: opacity 0.2s ease;
 }
 
 .chrono-iframe-loading {
@@ -333,3 +334,10 @@
   flex-shrink: 0;
 }
 
+
+/* -- Import Excel Button -------------------------------------- */
+.chrono-ext-import-btn { background-color: #1659cb; color: #fff; border: 1px solid #1659cb; padding: 4px 15px; font-size: 14px; font-weight: 600; border-radius: 4px; cursor: pointer; transition: all 0.3s cubic-bezier(.645,.045,.355,1); height: 32px; display: inline-flex; align-items: center; justify-content: center; margin-left: 8px; }
+.chrono-ext-import-btn:hover { background-color: #3b7ce2; border-color: #3b7ce2; }
+.chrono-ext-import-btn:active { background-color: #1047a8; border-color: #1047a8; }
+
+.chrono-ext-attempts-badge { display: inline-block; background-color: #fff1f0; border: 1px solid #ffa39e; color: #cf1322; font-size: 10px; padding: 1px 6px; border-radius: 4px; margin-bottom: 4px; font-weight: 500; }

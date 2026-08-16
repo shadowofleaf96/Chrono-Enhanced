@@ -15,6 +15,19 @@
   const MAX_CONCURRENT = 4;            // max simultaneous iframe fetches
   const ATTR_PROCESSED = "data-chrono-status-processed";
 
+  // ── Inject Interceptor ────────────────────────────────────
+  const script = document.createElement('script');
+  script.src = chrome.runtime.getURL('intercept.js');
+  (document.head || document.documentElement).appendChild(script);
+
+  let apiTokens = null;
+  window.addEventListener('message', (event) => {
+    if (event.source !== window || !event.data) return;
+    if (event.data.type === 'CHRONO_TOKENS') {
+      apiTokens = event.data.tokens;
+    }
+  });
+
   // ── Status cache (CN → array of {status, color, time}) ────
   const statusCache = new Map();
   const LOG_ENTRIES_COUNT = 3;          // how many recent logs to show
@@ -42,150 +55,115 @@
     }
   }
 
-  // ── Iframe-based status fetcher ───────────────────────────
+  // ── API-based status fetcher ───────────────────────────
 
-  /**
-   * Load the detail page in a hidden iframe, click "Consignment Logs"
-   * tab, extract the N most recent timeline entries, then clean up.
-   * Returns an array: [{ status, color, time }, …]
-   */
-  function fetchViaIframe(cnCode) {
-    return new Promise((resolve) => {
-      if (statusCache.has(cnCode)) {
-        resolve(statusCache.get(cnCode));
-        return;
-      }
+  function getStatusColor(type) {
+    type = (type || "").toLowerCase();
+    if (type === "delivered") return "#52c41a"; // green
+    if (type === "attempted" || type.includes("undelivered")) return "#ff4d4f"; // red
+    if (type.includes("out_for_delivery") || type === "accept") return "#fa8c16"; // orange
+    if (type.includes("hub")) return "#1890ff"; // blue
+    if (type === "reschedule") return "#fadb14"; // yellow
+    return "#d9d9d9"; // gray
+  }
 
-      const iframe = document.createElement("iframe");
-      iframe.style.cssText =
-        "position:fixed;top:-9999px;left:-9999px;width:1200px;height:800px;opacity:0;pointer-events:none;border:none;";
-      iframe.src = BASE_URL + encodeURIComponent(cnCode);
-      document.body.appendChild(iframe);
+  function formatTime(timestamp) {
+    if (!timestamp) return "";
+    const d = new Date(timestamp);
+    const m = String(d.getMonth() + 1).padStart(2, '0');
+    const day = String(d.getDate()).padStart(2, '0');
+    const h = String(d.getHours()).padStart(2, '0');
+    const min = String(d.getMinutes()).padStart(2, '0');
+    return `${day}/${m} ${h}:${min}`;
+  }
 
-      let resolved = false;
-      let pollTimer = null;
-      let tabClicked = false;
+  async function fetchViaIframe(cnCode) { // Kept name for queue compatibility
+    if (statusCache.has(cnCode)) {
+      return statusCache.get(cnCode);
+    }
+    if (!apiTokens) {
+      console.warn("[ChronoExt] API tokens not captured yet. Retrying in 1s...");
+      await new Promise(r => setTimeout(r, 1000));
+      if (!apiTokens) return [{ status: "Auth Error", color: "#ef4444", time: "" }];
+    }
 
-      function finish(result) {
-        if (resolved) return;
-        resolved = true;
-        clearInterval(pollTimer);
-        clearTimeout(timeout);
-        statusCache.set(cnCode, result);
-        setTimeout(() => {
-          try { iframe.remove(); } catch (_) {}
-        }, 300);
-        resolve(result);
-      }
-
-      const timeout = setTimeout(() => {
-        console.warn(`[ChronoExt] Timeout fetching status for ${cnCode}`);
-        finish([{ status: "Timeout", color: "#f59e0b", time: "" }]);
-      }, IFRAME_TIMEOUT);
-
-      iframe.addEventListener("load", () => {
-        pollTimer = setInterval(() => {
-          try {
-            const iframeDoc = iframe.contentDocument || iframe.contentWindow?.document;
-            if (!iframeDoc) return;
-
-            // Step 1: Click the "Consignment Logs" tab if not done yet
-            if (!tabClicked) {
-              const tabs = iframeDoc.querySelectorAll('[role="tab"]');
-              for (const tab of tabs) {
-                if (tab.textContent.trim() === "Consignment Logs") {
-                  tab.click();
-                  tabClicked = true;
-                  break;
-                }
-              }
-              // If tab not found yet, wait
-              if (!tabClicked) return;
-              // Give React a moment to render the tab content
-              return;
-            }
-
-            // Step 2: Extract timeline entries from Consignment Logs
-            const timelineItems = iframeDoc.querySelectorAll(
-              '.ant-timeline-item'
-            );
-
-            if (timelineItems.length === 0) {
-              // Check if it explicitly rendered an empty state (e.g. brand new parcel)
-              if (iframeDoc.querySelector('.ant-empty')) {
-                finish([{ status: "No Data", color: "#d9d9d9", time: "" }]);
-              }
-              return; // not rendered yet
-            }
-
-            const entries = [];
-            for (let i = 0; i < Math.min(timelineItems.length, LOG_ENTRIES_COUNT); i++) {
-              const item = timelineItems[i];
-
-              // Get timestamp
-              const timeEl = item.querySelector('[class*="Component-eventTime-"]');
-              const time = timeEl ? timeEl.textContent.trim() : "";
-
-              // Get status text from the collapse content
-              // The status is in the last <p> inside Component-timelineEvent-
-              const eventEl = item.querySelector('[class*="Component-timelineEvent-"]');
-              let status = "";
-              let fullStatus = "";
-              if (eventEl) {
-                const paragraphs = eventEl.querySelectorAll('p');
-                // First p = header (e.g. "Consignment Status"), last = value
-                if (paragraphs.length >= 2) {
-                  status = paragraphs[paragraphs.length - 1].textContent.trim();
-                } else if (paragraphs.length === 1) {
-                  status = paragraphs[0].textContent.trim();
-                }
-                fullStatus = (eventEl.innerText || eventEl.textContent || "").trim().replace(/\n+/g, ' - ');
-              }
-
-              if (!status) {
-                // Fallback: try getting any text from the content area
-                const contentEl = item.querySelector('.ant-timeline-item-content');
-                if (contentEl) {
-                  fullStatus = (contentEl.innerText || contentEl.textContent || "").trim().replace(/\n+/g, ' - ');
-                  status = contentEl.textContent.trim().substring(0, 50);
-                }
-              }
-
-              // Get dot color from the timeline head
-              const headEl = item.querySelector('.ant-timeline-item-head');
-              let color = "#22d3ee"; // default cyan
-              if (headEl) {
-                // color might be in style or in class name
-                const bc = headEl.style.borderColor;
-                if (bc) color = bc;
-                // Also check the class for color hint
-                const cls = headEl.className || "";
-                const colorMatch = cls.match(/head-(#[0-9a-fA-F]+)/);
-                if (colorMatch) color = colorMatch[1];
-              }
-
-              if (status) {
-                if (!fullStatus) fullStatus = status;
-                entries.push({ status, color, time, fullStatus });
-              }
-            }
-
-            if (entries.length > 0) {
-              finish(entries);
-            }
-            // else keep polling — content might still be loading
-
-          } catch (err) {
-            console.warn(`[ChronoExt] Iframe access error for ${cnCode}:`, err);
-            finish([{ status: "Error", color: "#ef4444", time: "" }]);
-          }
-        }, IFRAME_POLL);
+    try {
+      const url = `https://projectxeuapi.shipsy.io/api/CRMDashboard/consignments/fetchOne?referenceNumber=${cnCode}&send_unmasked_data=false`;
+      const response = await fetch(url, {
+        method: "GET",
+        headers: apiTokens
       });
 
-      iframe.addEventListener("error", () => {
-        finish([{ status: "Error", color: "#ef4444", time: "" }]);
-      });
-    });
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
+
+      const json = await response.json();
+      
+      // Try to find events and attempt_count in various possible Shipsy response structures
+      let events = json.events || [];
+      let attemptCount = json.attempt_count || 0;
+      
+      // If the response is an array, take the first element
+      let dataObj = json;
+      if (Array.isArray(json) && json.length > 0) {
+        dataObj = json[0];
+        events = dataObj.events || [];
+        attemptCount = dataObj.attempt_count || 0;
+      }
+      
+      if (events.length === 0 && dataObj.data) {
+        if (dataObj.data.events) {
+          events = dataObj.data.events;
+        } else if (dataObj.data.pieces_detail && dataObj.data.pieces_detail.length > 0) {
+          events = dataObj.data.pieces_detail[0].events || [];
+          attemptCount = dataObj.data.pieces_detail[0].attempt_count || attemptCount;
+        } else {
+          events = dataObj.data.tracking_history || [];
+        }
+      }
+
+      console.log(`[ChronoExt] Parsed API Data for ${cnCode}:`, { events, attemptCount, raw: json });
+
+      if (!events || events.length === 0) {
+        const entries = [{ status: "No Data", color: "#d9d9d9", time: "" }];
+        entries.attempts = attemptCount;
+        statusCache.set(cnCode, entries);
+        return entries;
+      }
+
+      const entries = [];
+      entries.attempts = attemptCount;
+
+      for (let i = 0; i < Math.min(events.length, LOG_ENTRIES_COUNT); i++) {
+        const ev = events[i];
+        const status = ev.event_string || "Unknown";
+        
+        let fullStatus = status;
+        if (ev.reason) {
+          fullStatus += ` - ${ev.reason}`;
+        }
+        if (ev.hub_name) {
+          fullStatus += ` - ${ev.hub_name}`;
+        }
+        
+        entries.push({
+          status: status.substring(0, 50),
+          fullStatus: fullStatus,
+          color: getStatusColor(ev.type),
+          time: formatTime(ev.event_time)
+        });
+      }
+
+      statusCache.set(cnCode, entries);
+      return entries;
+
+    } catch (err) {
+      console.error(`[ChronoExt] API fetch error for ${cnCode}:`, err);
+      const entries = [{ status: "Error", color: "#ef4444", time: "" }];
+      statusCache.set(cnCode, entries);
+      return entries;
+    }
   }
 
   // ── Public fetch (with cache + queue) ─────────────────────
@@ -214,6 +192,13 @@
   function createStatusTimeline(entries) {
     const container = document.createElement("div");
     container.className = "chrono-ext-status-timeline";
+    
+    if (entries.attempts && entries.attempts !== '0') {
+      const attemptsBadge = document.createElement("div");
+      attemptsBadge.className = "chrono-ext-attempts-badge";
+      attemptsBadge.innerHTML = `Attempts: <strong>${entries.attempts}</strong>`;
+      container.appendChild(attemptsBadge);
+    }
 
     for (const entry of entries) {
       const row = document.createElement("div");
@@ -326,6 +311,128 @@
   // We intentionally do NOT modify the table headers or colgroups anymore.
   // Modifying React-controlled columns (<th>, <colgroup>) crashes the app 
   // when it tries to re-render, preventing new scans from appearing.
+
+  // ── Import Excel button ────────────────────────────────────
+
+  function ensureImportExcelButton(modal) {
+    if (modal.querySelector('.chrono-ext-import-btn')) return;
+
+    const scanInput = modal.querySelector('input[placeholder*="CN"], input[placeholder*="Add consignments"]');
+    if (!scanInput) return;
+
+    const fileInput = document.createElement('input');
+    fileInput.type = 'file';
+    fileInput.accept = '.xlsx, .xls, .csv';
+    fileInput.style.display = 'none';
+    
+    const btn = document.createElement('button');
+    btn.className = 'chrono-ext-import-btn';
+    btn.textContent = 'Import Excel';
+    
+    btn.addEventListener('click', (e) => {
+      e.preventDefault();
+      fileInput.click();
+    });
+
+    fileInput.addEventListener('change', async (e) => {
+      const file = e.target.files[0];
+      if (!file) return;
+      
+      const reader = new FileReader();
+      reader.onload = async function(evt) {
+        try {
+          const data = evt.target.result;
+          const workbook = XLSX.read(data, { type: 'binary' });
+          const firstSheetName = workbook.SheetNames[0];
+          const worksheet = workbook.Sheets[firstSheetName];
+          const rows = XLSX.utils.sheet_to_json(worksheet, { header: 1 });
+          
+          const modalTitleEl = modal.querySelector('.ant-modal-title');
+          const modalTitle = modalTitleEl ? modalTitleEl.textContent.toLowerCase() : '';
+          const isOutscan = modalTitle.includes('outscan');
+          
+          let codes = [];
+          // Start from row 6 (index 5)
+          for (let i = 5; i < rows.length; i++) {
+            let row = rows[i];
+            if (!row) continue;
+            
+            // If Outscan, grab from all columns. Otherwise (Inscan, Set RTO, etc), grab only Column A (index 0)
+            const columnsToRead = isOutscan ? row.length : 1;
+            
+            for (let j = 0; j < columnsToRead; j++) {
+              let val = row[j];
+              if (val && typeof val === 'string') {
+                let trimmed = val.trim();
+                let upper = trimmed.toUpperCase();
+                
+                // Exclude specific strings and check length
+                if (trimmed.length > 5 && 
+                    !upper.includes("ACCUSE FUTURAMA EXPRESS") && 
+                    !upper.includes("ACCUSE CHRONODIALI")) {
+                  codes.push(trimmed);
+                }
+              }
+            }
+          }
+          
+          if (codes.length > 0) {
+            const originalText = btn.textContent;
+            btn.style.pointerEvents = 'none';
+            btn.style.opacity = '0.7';
+            
+            for (let k = 0; k < codes.length; k++) {
+              btn.textContent = `Importing (${k + 1}/${codes.length})...`;
+              
+              const nativeInputValueSetter = Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype, "value").set;
+              if (nativeInputValueSetter) {
+                nativeInputValueSetter.call(scanInput, codes[k]);
+              } else {
+                scanInput.value = codes[k];
+              }
+              
+              scanInput.dispatchEvent(new Event('input', { bubbles: true }));
+              scanInput.dispatchEvent(new Event('change', { bubbles: true }));
+              
+              const enterEvent = new KeyboardEvent('keydown', {
+                key: 'Enter',
+                code: 'Enter',
+                keyCode: 13,
+                which: 13,
+                bubbles: true,
+                cancelable: true
+              });
+              scanInput.dispatchEvent(enterEvent);
+              
+              await new Promise(r => setTimeout(r, 400));
+            }
+            
+            btn.textContent = originalText;
+            btn.style.pointerEvents = 'auto';
+            btn.style.opacity = '1';
+          } else {
+            alert('No tracking codes found in row 6 or below.');
+          }
+        } catch (err) {
+          console.error('[ChronoExt] Error parsing Excel', err);
+          alert('Error parsing Excel file. Please make sure it is a valid spreadsheet.');
+        }
+        fileInput.value = '';
+      };
+      reader.readAsBinaryString(file);
+    });
+    
+    const wrapper = scanInput.closest('.ant-space-item') || scanInput.parentElement;
+    wrapper.appendChild(fileInput);
+    
+    // Add button directly after the input wrapper if possible, or append to parent
+    if (scanInput.closest('.ant-input-affix-wrapper')) {
+      const affix = scanInput.closest('.ant-input-affix-wrapper');
+      affix.parentNode.insertBefore(btn, affix.nextSibling);
+    } else {
+      wrapper.appendChild(btn);
+    }
+  }
 
   // ── Row processing ────────────────────────────────────────
 
@@ -459,10 +566,44 @@
   }
 
   // ── Custom Inscan at Hub Modal Logic ────────────────────────
+
+  function hideInscanOverlay() {
+    const overlay = document.querySelector('.chrono-iframe-overlay');
+    if (overlay) {
+      overlay.style.opacity = '0';
+      overlay.style.pointerEvents = 'none';
+    }
+  }
+
+  function showInscanOverlay() {
+    const overlay = document.querySelector('.chrono-iframe-overlay');
+    if (overlay) {
+      overlay.style.opacity = '1';
+      overlay.style.pointerEvents = 'auto';
+      if (overlay.dataset.ready === 'true') {
+        const loadingEl = overlay.querySelector('.chrono-iframe-loading');
+        if (loadingEl) loadingEl.style.display = 'none';
+        const iframe = overlay.querySelector('#chrono-inscan-iframe');
+        if (iframe) iframe.style.opacity = '1';
+      }
+    }
+  }
   
-  function openInscanModal() {
+  function preloadInscanModal(showImmediately = false) {
+    const existing = document.querySelector('.chrono-iframe-overlay');
+    if (existing) {
+      if (showImmediately) showInscanOverlay();
+      return;
+    }
+
     const overlay = document.createElement('div');
     overlay.className = 'chrono-iframe-overlay';
+    // Hidden during preload — opacity:0 lets the iframe actually render in background
+    if (!showImmediately) {
+      overlay.style.opacity = '0';
+      overlay.style.pointerEvents = 'none';
+    }
+    overlay.dataset.ready = 'false';
     overlay.innerHTML = `
       <div class="chrono-iframe-loading">Loading Scanner...</div>
       <iframe id="chrono-inscan-iframe" src="/ops/consignments"></iframe>
@@ -486,37 +627,66 @@
         
         // Try to find and click the Inscan button -> then 'Selected'
         let attempts = 0;
-        let step = 0; // 0 = find main button, 1 = find "Selected" dropdown item, 2 = wait for modal
+        let step = 0;
         
         const checkInterval = setInterval(() => {
           attempts++;
           
-          // If the modal has finally appeared, we are done!
           const modal = doc.querySelector('.ant-modal-content');
           if (modal) {
             clearInterval(checkInterval);
             overlay.querySelector('.chrono-iframe-loading').style.display = 'none';
             iframe.style.opacity = '1';
+            overlay.dataset.ready = 'true';
             
+
             // Apply UI updates to the modal immediately
             tick(doc);
             
-            // Watch for the modal to be closed by the user so we can remove the iframe
-            // Also call tick() on changes so newly scanned parcels get the status column!
-            const closeObserver = new MutationObserver(() => {
-              tick(doc);
-              if (!doc.querySelector('.ant-modal-content')) {
-                overlay.remove();
-                closeObserver.disconnect();
+            // Intercept close button (X) and Cancel button inside the iframe modal
+            // so they just HIDE our overlay instead of letting React destroy the modal
+            const interceptClose = () => {
+              const closeBtn = doc.querySelector('.ant-modal-close');
+              if (closeBtn && !closeBtn.dataset.chronoIntercepted) {
+                closeBtn.dataset.chronoIntercepted = 'true';
+                closeBtn.addEventListener('click', (e) => {
+                  e.preventDefault();
+                  e.stopPropagation();
+                  e.stopImmediatePropagation();
+                  hideInscanOverlay();
+                }, true); // capture phase to beat React
               }
+              
+              const footer = doc.querySelector('.ant-modal-footer');
+              if (footer) {
+                const cancelBtn = Array.from(footer.querySelectorAll('button')).find(
+                  b => b.textContent.trim() === 'Cancel'
+                );
+                if (cancelBtn && !cancelBtn.dataset.chronoIntercepted) {
+                  cancelBtn.dataset.chronoIntercepted = 'true';
+                  cancelBtn.addEventListener('click', (e) => {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    e.stopImmediatePropagation();
+                    hideInscanOverlay();
+                  }, true);
+                }
+              }
+            };
+            
+            interceptClose();
+            
+            // Also watch for DOM changes to keep tick() running for new scanned parcels
+            const modalObserverForTick = new MutationObserver(() => {
+              tick(doc);
+              interceptClose(); // Re-intercept in case React re-renders buttons
             });
-            closeObserver.observe(doc.body, { childList: true, subtree: true });
+            modalObserverForTick.observe(modal, { childList: true, subtree: true });
             
             return;
           }
 
           if (step === 0) {
-            // Find "Inscan at Hub" button
             const buttons = Array.from(doc.querySelectorAll('button, .ant-btn, [role="button"]'));
             const inscanBtn = buttons.find(b => {
               const text = b.textContent.toLowerCase();
@@ -524,13 +694,11 @@
             });
             
             if (inscanBtn) {
-              // Hover and click to open dropdown
               inscanBtn.dispatchEvent(new MouseEvent('mouseover', { bubbles: true }));
               inscanBtn.click();
               step = 1;
             }
           } else if (step === 1) {
-            // Find "Selected" in the dropdown menu
             const allEls = Array.from(doc.querySelectorAll('li, span, div, a'));
             const selectedTextNode = allEls.find(el => el.children.length === 0 && el.textContent.trim().toLowerCase() === 'selected');
             
@@ -542,17 +710,16 @@
               });
               step = 2;
             } else if (attempts % 6 === 0) {
-              // If dropdown didn't appear or closed, try clicking main button again
               step = 0;
             }
           }
           
           if (attempts > 30) { 
-            // Give up after 15 seconds. Fallback: remove the hiding CSS and just show the raw page so the user can click it.
             clearInterval(checkInterval);
-            style.remove(); // Unhide the layout
+            style.remove();
             overlay.querySelector('.chrono-iframe-loading').style.display = 'none';
             iframe.style.opacity = '1';
+            overlay.dataset.ready = 'true';
           }
         }, 500);
       } catch (e) {
@@ -565,17 +732,15 @@
   function ensureInscanButton() {
     if (!location.pathname.includes("/ops/reconciliation/recon/")) return;
     
-    // Look for the "Reconcile" button or the container of those buttons
     const buttons = Array.from(document.querySelectorAll('button'));
     const reconcileBtn = buttons.find(b => b.textContent.trim() === 'Reconcile');
     const cancelBtn = buttons.find(b => b.textContent.trim() === 'Cancel');
     const reloadBtn = buttons.find(b => b.querySelector('.anticon-reload'));
     
-    // Attach listener to reload button so the toast can show again on soft refresh
     if (reloadBtn && !reloadBtn.dataset.chronoToastAttached) {
       reloadBtn.dataset.chronoToastAttached = 'true';
       reloadBtn.addEventListener('click', () => {
-        toastShownForUrl = null; // Reset the toast blocker
+        toastShownForUrl = null;
       });
     }
     
@@ -583,12 +748,10 @@
       const container = reconcileBtn.parentElement;
       const inscanBtn = document.createElement('button');
       
-      // Copy classes from the "Cancel" button to perfectly match design
       if (cancelBtn) {
         inscanBtn.className = cancelBtn.className;
         inscanBtn.classList.add('chrono-inscan-ext-btn');
       } else {
-        // Fallback styling if Cancel button is missing for some reason
         inscanBtn.className = "ant-btn chrono-inscan-ext-btn";
         inscanBtn.style.color = "#1890ff";
         inscanBtn.style.borderColor = "#1890ff";
@@ -598,16 +761,23 @@
       inscanBtn.style.marginRight = "8px";
       inscanBtn.innerHTML = `<span>Inscan at Hub</span>`;
       
-      // Insert right before Cancel/Reconcile
       container.insertBefore(inscanBtn, reconcileBtn.previousElementSibling || reconcileBtn);
       
       inscanBtn.addEventListener('click', (e) => {
         e.preventDefault();
         e.stopPropagation();
-        openInscanModal();
+        
+        const overlay = document.querySelector('.chrono-iframe-overlay');
+        if (overlay) {
+          showInscanOverlay();
+        } else {
+          preloadInscanModal(true);
+        }
       });
     }
   }
+
+
 
   // ── Verify Completed Trips (Rider List) ─────────────────────
 
@@ -705,105 +875,105 @@
     }
   }
 
-  function fetchCompletedRiders() {
-    return new Promise((resolve, reject) => {
-      const iframe = document.createElement("iframe");
-      iframe.style.cssText = "position:fixed;top:0;left:0;width:10px;height:10px;opacity:0.01;pointer-events:none;z-index:-9999;";
-      iframe.src = "https://cross.chronodiali.ma/ops/retail/trip-manager";
-      document.body.appendChild(iframe);
+  async function fetchCompletedRiders() {
+    if (!apiTokens) {
+      console.warn("[ChronoExt] API tokens not captured yet. Cannot fetch completed riders.");
+      throw new Error("No API tokens available. Please refresh the page and try again.");
+    }
 
-      let resolved = false;
-      let tabClicked = false;
-      const completedRiders = new Set();
+    const completedRiders = new Set();
+    const url = "https://projectxeuapi.shipsy.io/api/retaildashboard/tripmanager/get";
+    
+    try {
+      // 1. Calculate fallback (today)
+      const today = new Date();
+      const todayStr = today.toISOString().split('T')[0];
+      let fromDate = todayStr;
+      let toDate = todayStr;
 
-      function finish(result, isError = false) {
-        if (resolved) return;
-        resolved = true;
-        clearInterval(pollTimer);
-        clearTimeout(timeoutTimer);
-        setTimeout(() => {
-          try { iframe.remove(); } catch (_) {}
-        }, 300);
-        if (isError) reject(result);
-        else resolve(result);
+      // 2. Try to extract date range from the Ant Design date picker on the page
+      try {
+        const inputs = document.querySelectorAll('.ant-picker-input input');
+        if (inputs && inputs.length >= 2) {
+          const startVal = inputs[0].value;
+          const endVal = inputs[1].value;
+          
+          // Helper to convert DD-MM-YYYY or DD/MM/YYYY to YYYY-MM-DD if needed
+          const parseDate = (str) => {
+            if (!str) return null;
+            // If already YYYY-MM-DD
+            if (/^\d{4}-\d{2}-\d{2}$/.test(str)) return str;
+            // If DD-MM-YYYY or DD/MM/YYYY
+            const match = str.match(/^(\d{2})[-/](\d{2})[-/](\d{4})$/);
+            if (match) return `${match[3]}-${match[2]}-${match[1]}`;
+            return null;
+          };
+
+          const parsedStart = parseDate(startVal);
+          const parsedEnd = parseDate(endVal);
+
+          if (parsedStart && parsedEnd) {
+            fromDate = parsedStart;
+            toDate = parsedEnd;
+          }
+        }
+      } catch (e) {
+        console.warn("[ChronoExt] Could not extract date from page, using today:", e);
       }
 
-      const timeoutTimer = setTimeout(() => {
-        finish(new Error("Timeout fetching completed trips"), true);
-      }, 45000);
+      // Exact payload from Shipsy Network tab
+      const payload = {
+        "last_trip_id": null,
+        "last_sort_field_value": null,
+        "result_per_page": 200, // increased to ensure we get all trips
+        "next_or_prev": "first",
+        "sort_by": "last_main_event_time",
+        "descending_order": true,
+        "from_date": fromDate,
+        "to_date": toDate,
+        "date_field": "last_main_event_time",
+        "organisation_reference_number": "",
+        "hub_id": "2477050730750414061", // Using the one captured from network tab
+        "bucket": "retail_completed",
+        "timezone": "Africa/Casablanca"
+      };
 
-      let pollTimer = null;
-      iframe.addEventListener("load", () => {
-        let attempts = 0;
-        pollTimer = setInterval(() => {
-          try {
-            attempts++;
-            const iframeDoc = iframe.contentDocument || iframe.contentWindow?.document;
-            if (!iframeDoc) return;
-
-            // 1. Find and click the "Completed" tab
-            if (!tabClicked) {
-              const tabs = iframeDoc.querySelectorAll('.ant-tabs-tab-btn');
-              let found = false;
-              for (const tab of tabs) {
-                if (tab.textContent.includes("Completed")) {
-                  tab.click();
-                  tabClicked = true;
-                  found = true;
-                  break;
-                }
-              }
-              if (!found) {
-                 if (attempts > 30) finish(new Error("Could not find Completed tab"), true);
-                 return;
-              }
-            }
-
-            // 2. Wait for the Completed tab to become active
-            const activeTab = iframeDoc.querySelector('.ant-tabs-tab-active');
-            if (!activeTab || !activeTab.textContent.includes("Completed")) return;
-
-            // 3. Ensure no loading spinner is active
-            const spinning = iframeDoc.querySelector('.ant-spin-spinning');
-            if (spinning) return; // Wait until spinner is gone
-
-            // 4. Find the main table anywhere in the document (Shipsy renders it outside the tab pane)
-            const tbody = iframeDoc.querySelector('.ant-table-tbody');
-            if (!tbody) {
-               return; // Wait for table to load
-            }
-
-            // 5. If table is empty but has ant-empty, just return empty set
-            const empty = iframeDoc.querySelector('.ant-empty');
-            const rows = tbody.querySelectorAll('tr.ant-table-row');
-            
-            if (rows.length === 0) {
-                if (empty) {
-                  finish(completedRiders);
-                }
-                return;
-            }
-
-            // Data is here! Parse it.
-            // 7th column is Rider Name in trip manager
-            rows.forEach(row => {
-               const cells = row.querySelectorAll('td.ant-table-cell');
-               if (cells.length >= 7) {
-                  const riderName = cells[6].textContent.trim();
-                  if (riderName) completedRiders.add(riderName);
-               }
-            });
-
-            // We got the data!
-            finish(completedRiders);
-
-          } catch (err) {
-            console.warn("[ChronoExt] Iframe access error for Trip Manager:", err);
-            // Ignore cross-origin errors during navigation
-          }
-        }, 1000);
+      const response = await fetch(url, {
+        method: "POST",
+        headers: {
+          ...apiTokens,
+          "Content-Type": "application/json"
+        },
+        body: JSON.stringify(payload)
       });
-    });
+
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
+
+      const json = await response.json();
+      
+      let pageData = [];
+      if (json && json.data && Array.isArray(json.data.page_data)) {
+        pageData = json.data.page_data;
+      } else if (Array.isArray(json)) {
+        pageData = json;
+      }
+
+      pageData.forEach(trip => {
+        // According to user provided JSON, driver_name is in extra_details
+        if (trip && trip.status === "completed" && trip.extra_details && trip.extra_details.driver_name) {
+          completedRiders.add(trip.extra_details.driver_name.trim());
+        }
+      });
+
+      console.log("[ChronoExt] Parsed completed riders API data:", Array.from(completedRiders));
+      return completedRiders;
+      
+    } catch (err) {
+      console.error("[ChronoExt] Error fetching completed riders via API:", err);
+      throw err;
+    }
   }
 
   // ── Auto-set Filters on Consignments Page ─────────────────
@@ -931,6 +1101,7 @@
     const modal = getScanModal(doc);
     if (!modal) return;
     widenModal(modal);
+    ensureImportExcelButton(modal);
     processTableRows(modal);
   }
 
@@ -973,6 +1144,10 @@
       modalObserver = null;
     }
   }, 1000);
+
+  // Start preloading the Inscan iframe immediately on any page
+  // so it's ready by the time the user reaches the recon page
+  preloadInscanModal();
 
   console.log("[ChronoExt] Parcel Status extension loaded ✓");
 })();

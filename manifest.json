@@ -5,12 +5,13 @@
   "description": "Enhanced features and tools for Chronodiali operations",
   "permissions": ["activeTab"],
   "host_permissions": [
-    "https://cross.chronodiali.ma/*"
+    "https://cross.chronodiali.ma/*",
+    "https://projectxeuapi.shipsy.io/*"
   ],
   "content_scripts": [
     {
       "matches": ["https://cross.chronodiali.ma/ops*"],
-      "js": ["content.js"],
+      "js": ["xlsx.full.min.js", "content.js"],
       "css": ["styles.css"],
       "run_at": "document_idle",
       "all_frames": true
@@ -20,5 +21,11 @@
     "16": "icons/logo-small.png",
     "48": "icons/logo-small.png",
     "128": "icons/logo-small.png"
-  }
+  },
+  "web_accessible_resources": [
+    {
+      "resources": ["intercept.js"],
+      "matches": ["https://cross.chronodiali.ma/*"]
+    }
+  ]
 }
