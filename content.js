@@ -643,43 +643,32 @@
             // Apply UI updates to the modal immediately
             tick(doc);
             
-            // Intercept close button (X) and Cancel button inside the iframe modal
+            // Intercept close button (X), Cancel button, and mask clicks using event delegation
             // so they just HIDE our overlay instead of letting React destroy the modal
-            const interceptClose = () => {
-              const closeBtn = doc.querySelector('.ant-modal-close');
-              if (closeBtn && !closeBtn.dataset.chronoIntercepted) {
-                closeBtn.dataset.chronoIntercepted = 'true';
-                closeBtn.addEventListener('click', (e) => {
+            if (!doc.dataset.chronoCloseIntercepted) {
+              doc.dataset.chronoCloseIntercepted = 'true';
+              doc.addEventListener('click', (e) => {
+                const closeBtn = e.target.closest('.ant-modal-close');
+                let isCancel = false;
+                const btn = e.target.closest('button');
+                if (btn && btn.textContent.trim() === 'Cancel' && btn.closest('.ant-modal-footer')) {
+                  isCancel = true;
+                }
+                const wrap = e.target.closest('.ant-modal-wrap');
+                const isMaskClick = wrap && e.target === wrap;
+
+                if (closeBtn || isCancel || isMaskClick) {
                   e.preventDefault();
                   e.stopPropagation();
                   e.stopImmediatePropagation();
                   hideInscanOverlay();
-                }, true); // capture phase to beat React
-              }
-              
-              const footer = doc.querySelector('.ant-modal-footer');
-              if (footer) {
-                const cancelBtn = Array.from(footer.querySelectorAll('button')).find(
-                  b => b.textContent.trim() === 'Cancel'
-                );
-                if (cancelBtn && !cancelBtn.dataset.chronoIntercepted) {
-                  cancelBtn.dataset.chronoIntercepted = 'true';
-                  cancelBtn.addEventListener('click', (e) => {
-                    e.preventDefault();
-                    e.stopPropagation();
-                    e.stopImmediatePropagation();
-                    hideInscanOverlay();
-                  }, true);
                 }
-              }
-            };
-            
-            interceptClose();
+              }, true); // capture phase to beat React
+            }
             
             // Also watch for DOM changes to keep tick() running for new scanned parcels
             const modalObserverForTick = new MutationObserver(() => {
               tick(doc);
-              interceptClose(); // Re-intercept in case React re-renders buttons
             });
             modalObserverForTick.observe(modal, { childList: true, subtree: true });
             
