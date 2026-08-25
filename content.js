@@ -614,6 +614,10 @@
     iframe.onload = () => {
       try {
         const doc = iframe.contentDocument;
+        if (!doc) {
+          console.warn("[ChronoExt] iframe.contentDocument is null (iframe may still be navigating). Skipping this onload.");
+          return;
+        }
         
         // Hide standard layout elements so it feels like a modal
         const style = doc.createElement('style');
@@ -645,8 +649,8 @@
             
             // Intercept close button (X), Cancel button, and mask clicks using event delegation
             // so they just HIDE our overlay instead of letting React destroy the modal
-            if (!doc.dataset.chronoCloseIntercepted) {
-              doc.dataset.chronoCloseIntercepted = 'true';
+            if (!doc.documentElement.dataset.chronoCloseIntercepted) {
+              doc.documentElement.dataset.chronoCloseIntercepted = 'true';
               doc.addEventListener('click', (e) => {
                 const closeBtn = e.target.closest('.ant-modal-close');
                 let isCancel = false;
