@@ -11,7 +11,7 @@
   "content_scripts": [
     {
       "matches": ["https://cross.chronodiali.ma/ops*"],
-      "js": ["xlsx.full.min.js", "content.js"],
+      "js": ["xlsx.full.min.js", "xlsx-populate.min.js", "content.js"],
       "css": ["styles.css"],
       "run_at": "document_idle",
       "all_frames": true
@@ -24,7 +24,7 @@
   },
   "web_accessible_resources": [
     {
-      "resources": ["intercept.js"],
+      "resources": ["intercept.js", "template/calcul-salaire-chrono-template.xlsx"],
       "matches": ["https://cross.chronodiali.ma/*"]
     }
   ]

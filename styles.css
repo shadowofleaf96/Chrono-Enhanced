@@ -341,3 +341,362 @@
 .chrono-ext-import-btn:active { background-color: #1047a8; border-color: #1047a8; }
 
 .chrono-ext-attempts-badge { display: inline-block; background-color: #fff1f0; border: 1px solid #ffa39e; color: #cf1322; font-size: 10px; padding: 1px 6px; border-radius: 4px; margin-bottom: 4px; font-weight: 500; }
+
+/* ── Salary Export Button (Trip Manager) ──────────────────────── */
+.chrono-ext-salary-btn {
+  margin-right: 8px;
+}
+
+/* ── Month Picker Modal ──────────────────────────────────────── */
+.chrono-ext-month-modal-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100vw;
+  height: 100vh;
+  background: rgba(0, 0, 0, 0.45);
+  backdrop-filter: blur(4px);
+  z-index: 1000000;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  animation: chrono-fade-in 0.2s ease-out;
+}
+
+@keyframes chrono-fade-in {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+.chrono-ext-month-modal {
+  background: #fff;
+  border-radius: 12px;
+  box-shadow: 0 12px 40px rgba(0, 0, 0, 0.2);
+  width: 400px;
+  max-width: 90vw;
+  overflow: hidden;
+  animation: chrono-modal-slide 0.25s ease-out;
+}
+
+@keyframes chrono-modal-slide {
+  from { transform: translateY(-20px); opacity: 0; }
+  to { transform: translateY(0); opacity: 1; }
+}
+
+.chrono-ext-month-modal-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 16px 20px;
+  border-bottom: 1px solid #f0f0f0;
+  background: linear-gradient(135deg, #f0f7ff 0%, #e6f4ff 100%);
+}
+
+.chrono-ext-month-modal-header h3 {
+  margin: 0;
+  font-size: 16px;
+  font-weight: 600;
+  color: #1a1a1a;
+}
+
+.chrono-ext-month-modal-close {
+  cursor: pointer;
+  font-size: 20px;
+  color: rgba(0, 0, 0, 0.45);
+  line-height: 1;
+  transition: color 0.2s;
+  width: 28px;
+  height: 28px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 50%;
+}
+.chrono-ext-month-modal-close:hover {
+  color: rgba(0, 0, 0, 0.85);
+  background: rgba(0, 0, 0, 0.06);
+}
+
+.chrono-ext-month-modal-body {
+  padding: 20px;
+}
+
+.chrono-ext-month-modal-body label {
+  display: block;
+  font-size: 13px;
+  font-weight: 500;
+  color: #595959;
+  margin-bottom: 10px;
+}
+
+.chrono-ext-month-modal-selects {
+  display: flex;
+  gap: 10px;
+}
+
+.chrono-ext-month-modal-selects select {
+  flex: 1;
+  height: 36px;
+  padding: 0 12px;
+  border: 1px solid #d9d9d9;
+  border-radius: 6px;
+  font-size: 14px;
+  color: #262626;
+  background: #fff;
+  cursor: pointer;
+  transition: border-color 0.3s;
+  outline: none;
+  appearance: auto;
+}
+.chrono-ext-month-modal-selects select:hover {
+  border-color: #1890ff;
+}
+.chrono-ext-month-modal-selects select:focus {
+  border-color: #1890ff;
+  box-shadow: 0 0 0 2px rgba(24,144,255,0.2);
+}
+
+.chrono-ext-month-modal-footer {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+  padding: 12px 20px;
+  border-top: 1px solid #f0f0f0;
+  background: #fafafa;
+}
+
+.chrono-ext-modal-cancel-btn,
+.chrono-ext-modal-export-btn {
+  height: 32px;
+  padding: 0 16px;
+  border-radius: 6px;
+  font-size: 13px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.3s;
+  border: 1px solid;
+}
+
+.chrono-ext-modal-cancel-btn {
+  background: #fff;
+  border-color: #d9d9d9;
+  color: #595959;
+}
+.chrono-ext-modal-cancel-btn:hover {
+  border-color: #1890ff;
+  color: #1890ff;
+}
+.chrono-ext-modal-cancel-btn:disabled {
+  opacity: 0.5;
+  pointer-events: none;
+}
+
+.chrono-ext-modal-export-btn {
+  background: linear-gradient(135deg, #52c41a 0%, #389e0d 100%);
+  border-color: #52c41a;
+  color: #fff;
+  box-shadow: 0 2px 4px rgba(82,196,26,0.3);
+}
+.chrono-ext-modal-export-btn:hover {
+  background: linear-gradient(135deg, #73d13d 0%, #52c41a 100%);
+  box-shadow: 0 4px 8px rgba(82,196,26,0.4);
+}
+.chrono-ext-modal-export-btn:disabled {
+  opacity: 0.7;
+  pointer-events: none;
+}
+
+/* ── Progress bar ────────────────────────────────────────────── */
+.chrono-ext-month-modal-progress {
+  margin-top: 16px;
+}
+
+.chrono-ext-progress-bar {
+  width: 100%;
+  height: 6px;
+  background: #f0f0f0;
+  border-radius: 3px;
+  overflow: hidden;
+  margin-bottom: 8px;
+}
+
+.chrono-ext-progress-fill {
+  height: 100%;
+  background: linear-gradient(90deg, #1890ff, #52c41a);
+  border-radius: 3px;
+  width: 0%;
+  transition: width 0.4s ease;
+}
+
+.chrono-ext-progress-text {
+  font-size: 12px;
+  color: #8c8c8c;
+}
+
+/* ── Export Type Toggle (Month vs Day) ────────────────────────── */
+.chrono-ext-export-type-toggle {
+  display: flex;
+  background: #f0f2f5;
+  border-radius: 8px;
+  padding: 3px;
+  margin-bottom: 16px;
+  gap: 4px;
+}
+
+.chrono-ext-type-btn {
+  flex: 1;
+  border: none;
+  background: transparent;
+  padding: 8px 12px;
+  border-radius: 6px;
+  font-size: 13px;
+  font-weight: 500;
+  color: #595959;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+}
+
+.chrono-ext-type-btn:hover {
+  color: #1890ff;
+}
+
+.chrono-ext-type-btn.active {
+  background: #fff;
+  color: #1890ff;
+  font-weight: 600;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.08);
+}
+
+.chrono-ext-day-input-wrapper input[type="date"] {
+  width: 100%;
+  height: 36px;
+  padding: 0 12px;
+  border: 1px solid #d9d9d9;
+  border-radius: 6px;
+  font-size: 14px;
+  color: #262626;
+  background: #fff;
+  outline: none;
+  box-sizing: border-box;
+  transition: border-color 0.3s;
+}
+
+.chrono-ext-day-input-wrapper input[type="date"]:hover {
+  border-color: #1890ff;
+}
+
+.chrono-ext-day-input-wrapper input[type="date"]:focus {
+  border-color: #1890ff;
+  box-shadow: 0 0 0 2px rgba(24, 144, 255, 0.2);
+}
+
+
+/* -- Consignment Status Update Widget ------------------------ */
+.chrono-status-widget {
+  position: fixed;
+  bottom: 20px;
+  right: 20px;
+  background: #ffffff;
+  border-radius: 12px;
+  box-shadow: 0 8px 30px rgba(0, 0, 0, 0.15);
+  border: 1px solid #e8e8e8;
+  width: 300px;
+  z-index: 100000;
+  overflow: hidden;
+  font-family: inherit;
+  animation: chrono-slide-up 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+@keyframes chrono-slide-up {
+  from { transform: translateY(20px); opacity: 0; }
+  to { transform: translateY(0); opacity: 1; }
+}
+
+.chrono-status-header {
+  background: linear-gradient(135deg, #1890ff 0%, #0050b3 100%);
+  color: #fff;
+  padding: 12px 16px;
+  font-weight: 600;
+  font-size: 14px;
+  letter-spacing: 0.3px;
+  border-bottom: 1px solid #0050b3;
+}
+
+.chrono-status-body {
+  padding: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.chrono-status-select {
+  width: 100%;
+  height: 38px;
+  padding: 0 12px;
+  border: 1px solid #d9d9d9;
+  border-radius: 6px;
+  font-size: 14px;
+  color: #262626;
+  background: #fff;
+  outline: none;
+  cursor: pointer;
+  transition: all 0.3s;
+}
+
+.chrono-status-select:hover, .chrono-status-select:focus {
+  border-color: #40a9ff;
+  box-shadow: 0 0 0 2px rgba(24, 144, 255, 0.2);
+}
+
+.chrono-status-btn {
+  width: 100%;
+  height: 38px;
+  background: #1890ff;
+  color: #fff;
+  border: none;
+  border-radius: 6px;
+  font-size: 14px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.chrono-status-btn:hover:not(:disabled) {
+  background: #40a9ff;
+}
+
+.chrono-status-btn:disabled {
+  background: #f5f5f5;
+  color: #b8b8b8;
+  border: 1px solid #d9d9d9;
+  cursor: not-allowed;
+}
+
+
+.chrono-status-reason {
+  width: 100%;
+  height: 38px;
+  padding: 0 12px;
+  margin-top: -4px;
+  margin-bottom: 4px;
+  border: 1px solid #d9d9d9;
+  border-radius: 6px;
+  font-size: 14px;
+  color: #262626;
+  background: #fff;
+  outline: none;
+  transition: all 0.3s;
+}
+
+.chrono-status-reason:hover, .chrono-status-reason:focus {
+  border-color: #40a9ff;
+  box-shadow: 0 0 0 2px rgba(24, 144, 255, 0.2);
+}
+

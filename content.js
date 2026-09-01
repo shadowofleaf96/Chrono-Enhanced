@@ -969,7 +969,649 @@
     }
   }
 
-  // ── Auto-set Filters on Consignments Page ─────────────────
+  // ── Salary Report Export (Trip Manager) ────────────────────
+
+  function ensureSalaryExportButton() {
+    if (!location.pathname.includes("/ops/retail/trip-manager")) return;
+    if (document.querySelector('.chrono-ext-salary-btn')) return;
+
+    // Find the right-side toolbar container (has Action, Download, pagination)
+    const rightItems = document.querySelector('[class*="rightItems"]');
+    if (!rightItems) return;
+
+    const btn = document.createElement('button');
+    btn.type = 'button';
+    // Use the exact same classes as the Action/Download buttons for consistent design
+    btn.className = 'ant-btn middleButton-0-3-123 secondaryButton-0-3-118 chrono-ext-salary-btn';
+    btn.innerHTML = `<span>📊 Export Salary</span>`;
+    // Insert as first child so it appears to the LEFT of Action/Download
+    rightItems.insertBefore(btn, rightItems.firstChild);
+
+    btn.addEventListener('click', (e) => {
+      e.preventDefault();
+      e.stopPropagation();
+      showMonthPickerModal();
+    });
+  }
+
+  function showMonthPickerModal() {
+    // Remove any existing modal
+    const existing = document.querySelector('.chrono-ext-month-modal-overlay');
+    if (existing) existing.remove();
+
+    const now = new Date();
+    const currentMonth = now.getMonth();
+    const currentYear = now.getFullYear();
+    const todayStr = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
+
+    const monthNames = [
+      'Janvier', 'Février', 'Mars', 'Avril', 'Mai', 'Juin',
+      'Juillet', 'Août', 'Septembre', 'Octobre', 'Novembre', 'Décembre'
+    ];
+
+    const monthOptions = monthNames.map((name, i) =>
+      `<option value="${i}" ${i === currentMonth ? 'selected' : ''}>${name}</option>`
+    ).join('');
+
+    let yearOptions = '';
+    for (let y = currentYear; y >= currentYear - 2; y--) {
+      yearOptions += `<option value="${y}" ${y === currentYear ? 'selected' : ''}>${y}</option>`;
+    }
+
+    const overlay = document.createElement('div');
+    overlay.className = 'chrono-ext-month-modal-overlay';
+    overlay.innerHTML = `
+      <div class="chrono-ext-month-modal">
+        <div class="chrono-ext-month-modal-header">
+          <h3>📊 Export Salary Report</h3>
+          <span class="chrono-ext-month-modal-close">×</span>
+        </div>
+        <div class="chrono-ext-month-modal-body">
+          <div class="chrono-ext-export-type-toggle">
+            <button type="button" class="chrono-ext-type-btn active" data-type="month">📅 Par Mois</button>
+            <button type="button" class="chrono-ext-type-btn" data-type="day">📆 Par Jour</button>
+          </div>
+
+          <div id="chrono-month-container">
+            <label>Sélectionner le mois :</label>
+            <div class="chrono-ext-month-modal-selects">
+              <select id="chrono-month-select">${monthOptions}</select>
+              <select id="chrono-year-select">${yearOptions}</select>
+            </div>
+          </div>
+
+          <div id="chrono-day-container" style="display:none;">
+            <label>Sélectionner la date :</label>
+            <div class="chrono-ext-day-input-wrapper">
+              <input type="date" id="chrono-day-input" value="${todayStr}" max="${todayStr}">
+            </div>
+          </div>
+
+          <div class="chrono-ext-month-modal-progress" style="display:none;">
+            <div class="chrono-ext-progress-bar"><div class="chrono-ext-progress-fill"></div></div>
+            <span class="chrono-ext-progress-text">Préparation...</span>
+          </div>
+        </div>
+        <div class="chrono-ext-month-modal-footer">
+          <button class="chrono-ext-modal-cancel-btn">Annuler</button>
+          <button class="chrono-ext-modal-export-btn">Exporter</button>
+        </div>
+      </div>
+    `;
+
+    document.body.appendChild(overlay);
+
+    // Toggle between Month and Day export
+    let currentExportType = 'month';
+    const typeBtns = overlay.querySelectorAll('.chrono-ext-type-btn');
+    const monthContainer = overlay.querySelector('#chrono-month-container');
+    const dayContainer = overlay.querySelector('#chrono-day-container');
+
+    typeBtns.forEach(btn => {
+      btn.addEventListener('click', () => {
+        typeBtns.forEach(b => b.classList.remove('active'));
+        btn.classList.add('active');
+        currentExportType = btn.dataset.type;
+
+        if (currentExportType === 'month') {
+          monthContainer.style.display = 'block';
+          dayContainer.style.display = 'none';
+        } else {
+          monthContainer.style.display = 'none';
+          dayContainer.style.display = 'block';
+        }
+      });
+    });
+
+    // Close handlers
+    const closeModal = () => overlay.remove();
+    overlay.querySelector('.chrono-ext-month-modal-close').addEventListener('click', closeModal);
+    overlay.querySelector('.chrono-ext-modal-cancel-btn').addEventListener('click', closeModal);
+    overlay.addEventListener('click', (e) => { if (e.target === overlay) closeModal(); });
+
+    // Export handler
+    overlay.querySelector('.chrono-ext-modal-export-btn').addEventListener('click', async () => {
+      let fromDate, toDate, exportOptions;
+
+      if (currentExportType === 'month') {
+        const month = parseInt(document.getElementById('chrono-month-select').value);
+        const year = parseInt(document.getElementById('chrono-year-select').value);
+        fromDate = `${year}-${String(month + 1).padStart(2, '0')}-01`;
+        const lastDay = new Date(year, month + 1, 0).getDate();
+        toDate = `${year}-${String(month + 1).padStart(2, '0')}-${String(lastDay).padStart(2, '0')}`;
+        exportOptions = { type: 'month', year, month };
+      } else {
+        const dayVal = document.getElementById('chrono-day-input').value;
+        if (!dayVal) {
+          alert('Veuillez sélectionner une date.');
+          return;
+        }
+        fromDate = dayVal;
+        toDate = dayVal;
+        exportOptions = { type: 'day', date: dayVal };
+      }
+
+      const exportBtn = overlay.querySelector('.chrono-ext-modal-export-btn');
+      const cancelBtn = overlay.querySelector('.chrono-ext-modal-cancel-btn');
+      const closeBtn = overlay.querySelector('.chrono-ext-month-modal-close');
+      const progress = overlay.querySelector('.chrono-ext-month-modal-progress');
+      const progressText = overlay.querySelector('.chrono-ext-progress-text');
+      const progressFill = overlay.querySelector('.chrono-ext-progress-fill');
+
+      exportBtn.disabled = true;
+      exportBtn.textContent = 'Exportation...';
+      cancelBtn.disabled = true;
+      closeBtn.style.pointerEvents = 'none';
+      progress.style.display = 'block';
+
+      try {
+        progressText.textContent = exportOptions.type === 'month'
+          ? 'Récupération des données du mois...'
+          : 'Récupération des données du jour...';
+        progressFill.style.width = '20%';
+
+        const trips = await fetchTripData(fromDate, toDate);
+
+        progressText.textContent = `${trips.length} trips trouvés. Récupération des détails...`;
+        progressFill.style.width = '40%';
+
+        const riderStats = await aggregateRiderStats(trips, (current, total) => {
+          const pct = 40 + Math.floor((current / total) * 40);
+          progressFill.style.width = `${pct}%`;
+          progressText.textContent = `Analyse des détails... (${current}/${total})`;
+        });
+
+        progressText.textContent = 'Génération du fichier Excel...';
+        progressFill.style.width = '80%';
+
+        await exportSalaryReport(riderStats, exportOptions);
+
+        progressText.textContent = '✅ Export terminé !';
+        progressFill.style.width = '100%';
+
+        setTimeout(() => overlay.remove(), 1500);
+      } catch (err) {
+        console.error('[ChronoExt] Salary export error:', err);
+        progressText.textContent = `❌ Erreur: ${err.message}`;
+        progressFill.style.width = '100%';
+        progressFill.style.background = '#ff4d4f';
+        exportBtn.disabled = false;
+        exportBtn.textContent = 'Réessayer';
+        cancelBtn.disabled = false;
+        closeBtn.style.pointerEvents = 'auto';
+      }
+    });
+  }
+
+  async function fetchTripData(fromDate, toDate) {
+    if (!apiTokens) {
+      throw new Error('Tokens API non disponibles. Rafraîchissez la page et réessayez.');
+    }
+
+    console.log(`[ChronoExt] Fetching trips from ${fromDate} to ${toDate}`);
+
+    const url = 'https://projectxeuapi.shipsy.io/api/retaildashboard/tripmanager/get';
+    const allTrips = [];
+    let lastTripId = null;
+    let lastSortFieldValue = null;
+    let hasMore = true;
+    let pageNum = 0;
+
+    while (hasMore) {
+      pageNum++;
+      const payload = {
+        last_trip_id: lastTripId,
+        last_sort_field_value: lastSortFieldValue,
+        result_per_page: 200,
+        next_or_prev: lastTripId ? 'next' : 'first',
+        sort_by: 'last_main_event_time',
+        descending_order: true,
+        from_date: fromDate,
+        to_date: toDate,
+        date_field: 'last_main_event_time',
+        organisation_reference_number: '',
+        hub_id: '2477050730750414061',
+        bucket: 'retail_completed',
+        timezone: 'Africa/Casablanca'
+      };
+
+      const response = await fetch(url, {
+        method: 'POST',
+        headers: { ...apiTokens, 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload)
+      });
+
+      if (!response.ok) throw new Error(`API error: ${response.status}`);
+
+      const json = await response.json();
+      let pageData = [];
+
+      if (json && json.data && Array.isArray(json.data.page_data)) {
+        pageData = json.data.page_data;
+      }
+
+      console.log(`[ChronoExt] Page ${pageNum}: received ${pageData.length} trips (total so far: ${allTrips.length + pageData.length})`);
+
+      if (pageData.length === 0) {
+        hasMore = false;
+        break;
+      }
+
+      allTrips.push(...pageData);
+
+      // Log first trip keys for reference
+      if (pageNum === 1 && pageData.length > 0) {
+        const sample = pageData[0];
+        console.log('[ChronoExt] Sample trip — top keys:', Object.keys(sample));
+      }
+
+      const lastTrip = pageData[pageData.length - 1];
+      const nextTripId = lastTrip.id || lastTrip.trip_id;
+
+      // Stop if pagination pointer did not advance to prevent infinite loop
+      if (nextTripId === lastTripId) {
+        hasMore = false;
+        break;
+      }
+
+      lastTripId = nextTripId;
+      lastSortFieldValue = lastTrip.last_main_event_time ?? lastTrip.end_time ?? lastTrip.updated_at;
+
+      // Check if API specifies total_count
+      const totalCount = json.data?.total_count || json.data?.total_records || json.data?.total;
+      if (totalCount && allTrips.length >= totalCount) {
+        hasMore = false;
+        break;
+      }
+
+      if (json.data?.has_next === false || json.data?.is_last_page === true) {
+        hasMore = false;
+        break;
+      }
+
+      // Safety guard against runaway loops
+      if (pageNum >= 60) {
+        hasMore = false;
+        break;
+      }
+    }
+
+    console.log(`[ChronoExt] Fetched ${allTrips.length} completed trips across ${pageNum} page(s)`);
+    return allTrips;
+  }
+
+  // Backward-compatibility wrapper
+  async function fetchMonthlyTripData(year, month) {
+    const fromDate = `${year}-${String(month + 1).padStart(2, '0')}-01`;
+    const lastDay = new Date(year, month + 1, 0).getDate();
+    const toDate = `${year}-${String(month + 1).padStart(2, '0')}-${String(lastDay).padStart(2, '0')}`;
+    return fetchTripData(fromDate, toDate);
+  }
+
+  let loggedFirstSummary = false;
+
+  async function getTripTaskSummary(tripId, retries = 2) {
+    if (!apiTokens) {
+      console.warn('[ChronoExt] apiTokens missing in getTripTaskSummary');
+      return null;
+    }
+    const url = `https://projectxeuapi.shipsy.io/api/RetailDashboard/trip/getTaskSummary?trip_id=${tripId}`;
+    for (let attempt = 0; attempt <= retries; attempt++) {
+      try {
+        const res = await fetch(url, {
+          method: 'GET',
+          headers: {
+            ...apiTokens,
+            'Accept': 'application/json, text/plain, */*'
+          }
+        });
+        if (res.status === 429) {
+          // Rate limit backoff
+          await new Promise(r => setTimeout(r, 1000 * (attempt + 1)));
+          continue;
+        }
+        if (!res.ok) {
+          console.warn(`[ChronoExt] getTaskSummary failed (${res.status}) for trip ${tripId}`);
+          return null;
+        }
+        const json = await res.json();
+        if (!loggedFirstSummary) {
+          loggedFirstSummary = true;
+          console.log('[ChronoExt] Sample getTaskSummary raw response:', json);
+        }
+        return json;
+      } catch (e) {
+        if (attempt < retries) {
+          await new Promise(r => setTimeout(r, 500));
+          continue;
+        }
+        console.error(`[ChronoExt] Error fetching task summary for ${tripId}:`, e);
+        return null;
+      }
+    }
+    return null;
+  }
+
+  function getCanonicalRiderName(rawName) {
+    if (!rawName) return '';
+    const trimmed = rawName.trim();
+    const lower = trimmed.toLowerCase();
+
+    // Map known aliases to unified canonical key
+    if (lower === 'walid aichi' || lower === 'omar') return 'omar';
+    if (lower === 'abd assamad krim' || lower === 'sami') return 'sami';
+    if (lower === 'badr hachimi' || lower === 'bader hachimi') return 'bader hachimi';
+
+    return lower;
+  }
+
+  function extractMetric(data, keys) {
+    if (!data || typeof data !== 'object') return null;
+
+    // Direct property lookup
+    for (const k of keys) {
+      if (data[k] !== undefined && data[k] !== null && data[k] !== '') {
+        const n = Number(data[k]);
+        if (!isNaN(n)) return n;
+      }
+    }
+
+    // Normalized (lowercase, no spaces/underscores/dashes) lookup
+    const normalizedMap = new Map();
+    for (const [prop, val] of Object.entries(data)) {
+      if (val !== undefined && val !== null && val !== '') {
+        const norm = prop.toLowerCase().replace(/[\s_\-]/g, '');
+        const n = Number(val);
+        if (!isNaN(n)) normalizedMap.set(norm, n);
+      }
+    }
+
+    for (const k of keys) {
+      const norm = k.toLowerCase().replace(/[\s_\-]/g, '');
+      if (normalizedMap.has(norm)) {
+        return normalizedMap.get(norm);
+      }
+    }
+
+    return null;
+  }
+
+  function normalizeSummaryData(raw) {
+    if (!raw) return {};
+    let data = raw.data !== undefined ? raw.data : raw;
+    if (Array.isArray(data)) {
+      const obj = {};
+      for (const item of data) {
+        if (typeof item === 'string') {
+          const m = item.match(/^(\d+)\s+(.+)$/);
+          if (m) obj[m[2].trim()] = Number(m[1]);
+        } else if (item && typeof item === 'object') {
+          const key = item.status || item.label || item.type || item.name || item.key || item.task_status || item.task_type;
+          const val = item.count ?? item.value ?? item.val ?? item.qty ?? item.quantity ?? item.total;
+          if (key !== undefined && val !== undefined) {
+            obj[String(key).trim()] = Number(val);
+          }
+        }
+      }
+      return obj;
+    }
+    return (typeof data === 'object' && data !== null) ? data : {};
+  }
+
+  function parseTaskSummary(raw) {
+    const data = normalizeSummaryData(raw);
+
+    // Candidates in priority order (do NOT include delivery_task_count which is planned total)
+    const delivered = extractMetric(data, [
+      'Delivered', 'delivered', 'delivered_task_count', 'delivered_count', 'success_task_count', 'deliveredCount'
+    ]) ?? 0;
+
+    const undelivered = extractMetric(data, [
+      'Undelivered', 'undelivered', 'undelivered_task_count', 'attempted_task_count', 'failed_task_count', 'undelivered_count', 'attempted_count'
+    ]) ?? 0;
+
+    const pickupCompleted = extractMetric(data, [
+      'Pickup Completed', 'pickup_completed', 'pickup_completed_task_count', 'pickedup_task_count', 'pickedup_count', 'pickupCompleted'
+    ]) ?? 0;
+
+    const pendingDelivery = extractMetric(data, [
+      'Pending Delivery', 'pending_delivery', 'pending_delivery_task_count', 'incomplete_delivery_task_count', 'pending_task_count', 'pendingDelivery'
+    ]) ?? 0;
+
+    const pendingPickup = extractMetric(data, [
+      'Pending Pickup', 'pending_pickup', 'pending_pickup_task_count', 'incomplete_pickup_task_count', 'pendingPickup'
+    ]) ?? 0;
+
+    const notPickedUp = extractMetric(data, [
+      'Not Picked Up', 'not_picked_up', 'not_picked_up_task_count', 'notpickedup_task_count', 'notpickedup_count', 'notPickedUp'
+    ]) ?? 0;
+
+    const total = extractMetric(data, [
+      'total_task_count', 'total_tasks', 'total_shipment_count', 'totalCount', 'total'
+    ]);
+
+    return {
+      delivered,
+      undelivered,
+      pickupCompleted,
+      pendingDelivery,
+      pendingPickup,
+      notPickedUp,
+      total
+    };
+  }
+
+  async function aggregateRiderStats(trips, progressCallback) {
+    const stats = new Map();
+
+    const batchSize = 10;
+    for (let i = 0; i < trips.length; i += batchSize) {
+      const batch = trips.slice(i, i + batchSize);
+      
+      if (progressCallback) progressCallback(i, trips.length);
+
+      await Promise.all(batch.map(async (trip) => {
+        const rawDriver = (trip.extra_details && trip.extra_details.driver_name)
+                          ? trip.extra_details.driver_name.trim()
+                          : (trip.worker_name ? trip.worker_name.trim() : null);
+        if (!rawDriver) return;
+
+        const canonicalDriver = getCanonicalRiderName(rawDriver);
+
+        // Fetch task summary for this trip
+        const tripId = trip.id || trip.trip_id;
+        const summaryRaw = await getTripTaskSummary(tripId);
+        const summary = parseTaskSummary(summaryRaw);
+
+        if (canonicalDriver.includes('hachimi') || canonicalDriver.includes('bader') || canonicalDriver.includes('omar')) {
+          console.log(`[ChronoExt] Trip ${tripId} (${rawDriver} -> ${canonicalDriver}): Delivered=${summary.delivered}, Undelivered=${summary.undelivered}, Total=${trip.total_task_count}`);
+        }
+
+        if (!stats.has(canonicalDriver)) {
+          stats.set(canonicalDriver, {
+            displayName: rawDriver,
+            totalParcels: 0,
+            delivered: 0,
+            undelivered: 0,
+            recovered: 0,
+            postponed: 0
+          });
+        }
+        const s = stats.get(canonicalDriver);
+
+        const delivered = summary.delivered;
+        const undelivered = summary.undelivered;
+        const pickupCompleted = summary.pickupCompleted;
+        const pendingDelivery = summary.pendingDelivery;
+        const pendingPickup = summary.pendingPickup;
+        const notPickedUp = summary.notPickedUp;
+
+        const summarySum = delivered + undelivered + pickupCompleted + pendingDelivery + pendingPickup + notPickedUp;
+        const totalFromApi = Number(trip.total_task_count || trip.total_shipment_count || 0);
+        const total = totalFromApi > 0 ? totalFromApi : ((summary.total !== null && summary.total > 0) ? summary.total : summarySum);
+
+        s.totalParcels += total;
+        s.delivered += delivered + pickupCompleted;  // Completed pickups count as delivered
+        s.undelivered += undelivered;
+      }));
+    }
+
+    if (progressCallback) progressCallback(trips.length, trips.length);
+
+    console.log('[ChronoExt] Aggregated rider stats:');
+    for (const [name, data] of stats) {
+      console.log(`  ${name} (${data.displayName}): Total=${data.totalParcels}, Delivered=${data.delivered}, Undelivered=${data.undelivered}`);
+    }
+
+    return stats;
+  }
+
+  async function exportSalaryReport(riderStats, exportOptions) {
+    let opt = {};
+    if (typeof exportOptions === 'object' && exportOptions !== null) {
+      opt = exportOptions;
+    } else {
+      opt = { type: 'month', year: arguments[1], month: arguments[2] };
+    }
+
+    // Fetch the bundled Excel template
+    const templateUrl = chrome.runtime.getURL('template/calcul-salaire-chrono-template.xlsx');
+    const response = await fetch(templateUrl);
+    if (!response.ok) throw new Error('Impossible de charger le template Excel');
+    const arrayBuffer = await response.arrayBuffer();
+
+    // Use xlsx-populate which preserves ALL formatting (colors, borders, fonts, merges)
+    const wb = await XlsxPopulate.fromDataAsync(arrayBuffer);
+    const sheet = wb.sheet(0);
+
+    // Update header in B1 (xlsx-populate is 1-indexed)
+    if (opt.type === 'day') {
+      const parts = opt.date.split('-'); // [YYYY, MM, DD]
+      sheet.cell('B1').value(`JOUR ${parts[2]}/${parts[1]}/${parts[0]}`);
+    } else {
+      sheet.cell('B1').value(`MOIS ${opt.month + 1}/${opt.year}`);
+    }
+
+    // Read rider names from A3 onwards and fill data
+    let row = 3; // 1-indexed, so A3 = row 3
+    let totalParcels = 0, totalDelivered = 0, totalUndelivered = 0;
+    let totalRecovered = 0, totalPostponed = 0;
+
+    while (true) {
+      const cellVal = sheet.cell(row, 1).value(); // Column A
+      if (cellVal === undefined || cellVal === null) break;
+
+      const name = cellVal.toString().trim();
+      if (name === '' || name.toUpperCase() === 'TOTAL') break;
+
+      // Find matching rider using canonical name matching
+      const nameCanonical = getCanonicalRiderName(name);
+      let matched = null;
+
+      if (riderStats.has(nameCanonical)) {
+        matched = riderStats.get(nameCanonical);
+      } else {
+        // Fallback: check vowel-normalized or substring
+        for (const [riderKey, riderData] of riderStats) {
+          if (
+            riderKey === nameCanonical ||
+            riderKey.replace(/e/g, '') === nameCanonical.replace(/e/g, '') ||
+            riderKey.includes(nameCanonical) ||
+            nameCanonical.includes(riderKey)
+          ) {
+            matched = riderData;
+            break;
+          }
+        }
+      }
+
+      if (matched) {
+        const sr = matched.totalParcels > 0
+          ? Math.round((matched.delivered / matched.totalParcels) * 100)
+          : 0;
+
+        // .value() preserves all existing cell formatting (colors, borders, fonts)
+        sheet.cell(row, 2).value(matched.totalParcels);    // B: T.Colis
+        sheet.cell(row, 3).value(matched.delivered);        // C: Livrés
+        sheet.cell(row, 4).value(matched.undelivered);      // D: Non Livrés
+        sheet.cell(row, 5).value('-');                       // E: R.Récupéré
+        sheet.cell(row, 6).value('-');                       // F: R.Ajourné
+        sheet.cell(row, 7).value(`${sr}%`);                 // G: SR%
+
+        totalParcels += matched.totalParcels;
+        totalDelivered += matched.delivered;
+        totalUndelivered += matched.undelivered;
+      }
+      // If not matched, leave cells untouched — original styling preserved
+
+      row++;
+    }
+
+    // Find and fill TOTAL row
+    for (let r = row; r <= row + 5; r++) {
+      const cellVal = sheet.cell(r, 1).value();
+      if (cellVal && cellVal.toString().trim().toUpperCase() === 'TOTAL') {
+        const totalSr = totalParcels > 0
+          ? Math.round((totalDelivered / totalParcels) * 100)
+          : 0;
+
+        sheet.cell(r, 2).value(totalParcels);
+        sheet.cell(r, 3).value(totalDelivered);
+        sheet.cell(r, 4).value(totalUndelivered);
+        sheet.cell(r, 5).value(totalRecovered);
+        sheet.cell(r, 6).value(totalPostponed);
+        sheet.cell(r, 7).value(`${totalSr}%`);
+        break;
+      }
+    }
+
+    // Generate and download — xlsx-populate outputs a Blob with full formatting
+    let filename = '';
+    if (opt.type === 'day') {
+      const parts = opt.date.split('-');
+      filename = `calcul-salaire-${parts[2]}-${parts[1]}-${parts[0]}.xlsx`;
+    } else {
+      const monthNamesFile = [
+        'Janvier', 'Fevrier', 'Mars', 'Avril', 'Mai', 'Juin',
+        'Juillet', 'Aout', 'Septembre', 'Octobre', 'Novembre', 'Decembre'
+      ];
+      filename = `calcul-salaire-${monthNamesFile[opt.month]}-${opt.year}.xlsx`;
+    }
+
+    const blob = await wb.outputAsync();
+    const downloadUrl = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = downloadUrl;
+    a.download = filename;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(downloadUrl);
+
+    console.log(`[ChronoExt] Salary report exported: ${filename}`);
+  }
+
+
   
   function triggerReactClick(element) {
     if (!element) return;
@@ -1104,6 +1746,8 @@
     ensureInscanButton();
     ensureVerifyCompletedButton();
     ensureDefaultFilters();
+    ensureSalaryExportButton();
+    ensureStatusUpdateUI();
     
     const modal = getScanModal(document);
     if (modal && !modalObserver) {
@@ -1124,6 +1768,8 @@
     ensureInscanButton();
     ensureVerifyCompletedButton();
     ensureDefaultFilters();
+    ensureSalaryExportButton();
+    ensureStatusUpdateUI();
     
     const modal = getScanModal(document);
     if (modal) {
@@ -1137,6 +1783,117 @@
       modalObserver = null;
     }
   }, 1000);
+
+  // ── Consignment Status Update ────────────────────────
+
+  function ensureStatusUpdateUI() {
+    if (!location.pathname.includes('/ops/details/')) {
+      const widget = document.querySelector('.chrono-status-widget');
+      if (widget) widget.remove();
+      return;
+    }
+
+    if (document.querySelector('.chrono-status-widget')) return;
+
+    // Extract reference number from URL
+    const parts = location.pathname.split('/');
+    const referenceNumber = parts[parts.length - 1];
+    if (!referenceNumber) return;
+
+    const widget = document.createElement('div');
+    widget.className = 'chrono-status-widget';
+    widget.innerHTML = `
+      <div class="chrono-status-header">Chrono: Update Status</div>
+      <div class="chrono-status-body">
+        <select class="chrono-status-select">
+          <option value="">-- Select Status --</option>
+          <option value="reached_at_hub">Reached at Hub</option>
+          <option value="delivered">Delivered</option>
+          <option value="attempted">Attempted / Undelivered</option>
+          <option value="cancelled">Cancelled</option>
+          <option value="pickup_completed">Pickup Completed</option>
+          <option value="reacheddestination">Reached Destination</option>
+          <option value="rto_delivered">RTO Delivered</option>
+        </select>
+        <input type="text" class="chrono-status-reason" placeholder="Reason (e.g. refused, absent)" style="display: none;" />
+        <button class="chrono-status-btn" disabled>Update</button>
+      </div>
+    `;
+
+    document.body.appendChild(widget);
+
+    const select = widget.querySelector('.chrono-status-select');
+    const reasonInput = widget.querySelector('.chrono-status-reason');
+    const btn = widget.querySelector('.chrono-status-btn');
+
+    const checkValidity = () => {
+      const isAttempted = select.value === 'attempted';
+      if (isAttempted) {
+        btn.disabled = !reasonInput.value.trim();
+      } else {
+        btn.disabled = !select.value;
+      }
+    };
+
+    select.addEventListener('change', () => {
+      if (select.value === 'attempted') {
+        reasonInput.style.display = 'block';
+      } else {
+        reasonInput.style.display = 'none';
+        reasonInput.value = '';
+      }
+      checkValidity();
+    });
+
+    reasonInput.addEventListener('input', checkValidity);
+
+    btn.addEventListener('click', async () => {
+      const eventCode = select.value;
+      if (!eventCode) return;
+      const reason = reasonInput.value.trim();
+
+      btn.disabled = true;
+      btn.textContent = 'Updating...';
+
+      try {
+        await updateConsignmentStatus(eventCode, referenceNumber, reason);
+        showToast(`Status successfully updated to ${eventCode}`);
+        setTimeout(() => location.reload(), 2000);
+      } catch (err) {
+        console.error('[ChronoExt] Status update failed:', err);
+        showToast('❌ Update failed. Check console.');
+        btn.disabled = false;
+        btn.textContent = 'Update';
+      }
+    });
+  }
+
+  async function updateConsignmentStatus(eventCode, referenceNumber) {
+    if (!apiTokens) {
+      throw new Error('API Tokens missing. Please refresh the page.');
+    }
+
+    const url = `https://projectxeuapi.shipsy.io/api/client/integration/consignment/event/${eventCode}`;
+    const payload = {
+      reference_number: referenceNumber,
+      event_time_epoch: Math.floor(Date.now() / 1000)
+    };
+
+    const headers = { ...apiTokens, 'Content-Type': 'application/json' };
+
+    const res = await fetch(url, {
+      method: 'POST',
+      headers,
+      body: JSON.stringify(payload)
+    });
+
+    if (!res.ok) {
+      const text = await res.text();
+      throw new Error(`API Error ${res.status}: ${text}`);
+    }
+
+    return await res.json();
+  }
 
   // Start preloading the Inscan iframe immediately on any page
   // so it's ready by the time the user reaches the recon page
