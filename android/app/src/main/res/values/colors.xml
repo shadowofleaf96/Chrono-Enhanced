@@ -1,0 +1,58 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Brand Primary (Chrono Diali Blue / Cyan) -->
+    <color name="chrono_primary">#0088CE</color>
+    <color name="chrono_primary_dark">#006EA6</color>
+    <color name="chrono_primary_light">#E0F2FE</color>
+    <color name="chrono_on_primary">#FFFFFF</color>
+
+    <!-- Secondary (Chrono Slate / Charcoal) -->
+    <color name="chrono_secondary">#414042</color>
+    <color name="chrono_secondary_light">#58575A</color>
+    <color name="chrono_on_secondary">#FFFFFF</color>
+
+    <!-- App Launcher Background -->
+    <color name="ic_launcher_background">#FFFFFF</color>
+
+    <!-- Status: Finished Trip & Delivered (Emerald / Success) -->
+    <color name="status_finished">#16A34A</color>
+    <color name="status_finished_bg">#DCFCE7</color>
+    <color name="status_finished_text">#15803D</color>
+
+    <!-- Status: In Transit / Ongoing (Amber / Warning) -->
+    <color name="status_transit">#D97706</color>
+    <color name="status_transit_bg">#FEF3C7</color>
+    <color name="status_transit_text">#B45309</color>
+
+    <!-- Status: Undelivered / Alert (Rose / Danger) -->
+    <color name="status_undelivered">#DC2626</color>
+    <color name="status_undelivered_bg">#FEE2E2</color>
+    <color name="status_undelivered_text">#991B1B</color>
+
+    <!-- Money / Settlement Colors (Moroccan Dirham Highlights) -->
+    <color name="settlement_green">#059669</color>
+    <color name="settlement_bg">#ECFDF5</color>
+    <color name="settlement_border">#A7F3D0</color>
+
+    <!-- Neutrals & Backgrounds -->
+    <color name="bg_screen">#F8FAFC</color>
+    <color name="bg_card">#FFFFFF</color>
+    <color name="bg_card_elevated">#FFFFFF</color>
+    <color name="divider_color">#E2E8F0</color>
+    <color name="text_primary">#0F172A</color>
+    <color name="text_secondary">#64748B</color>
+    <color name="text_muted">#94A3B8</color>
+
+    <!-- Accent & Highlights -->
+    <color name="badge_blue_bg">#EFF6FF</color>
+    <color name="badge_blue_text">#1D4ED8</color>
+
+    <!-- Marjane Mall Brand Colors -->
+    <color name="marjane_primary">#004B93</color>
+    <color name="marjane_primary_dark">#003366</color>
+    <color name="marjane_primary_light">#E6F0FA</color>
+    <color name="marjane_accent">#F7941D</color>
+    <color name="marjane_accent_dark">#D87D10</color>
+    <color name="marjane_accent_light">#FFF4E5</color>
+    <color name="marjane_on_primary">#FFFFFF</color>
+</resources>

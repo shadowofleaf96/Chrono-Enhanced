@@ -21,10 +21,29 @@
   (document.head || document.documentElement).appendChild(script);
 
   let apiTokens = null;
+  try {
+    const savedTokens = localStorage.getItem('chrono_api_tokens');
+    if (savedTokens) {
+      apiTokens = JSON.parse(savedTokens);
+    }
+  } catch(_) {}
+
   window.addEventListener('message', (event) => {
     if (event.source !== window || !event.data) return;
     if (event.data.type === 'CHRONO_TOKENS') {
       apiTokens = event.data.tokens;
+      console.log('🔑 [ChronoExt] Tokens de session capturés:', apiTokens);
+      try {
+        localStorage.setItem('chrono_api_tokens', JSON.stringify(apiTokens));
+      } catch(_) {}
+    }
+    if (event.data.type === 'CHRONO_API_INTERCEPT') {
+      const p = event.data.payload;
+      if (p.url.includes('getReconciliationData')) {
+        localStorage.setItem('chrono_api_getReconciliationData', JSON.stringify(p));
+      } else if (p.url.includes('transactionsHistory') || p.url.includes('Transaction') || p.url.includes('transaction')) {
+        localStorage.setItem('chrono_api_transactions', JSON.stringify(p));
+      }
     }
   });
 
@@ -567,11 +586,19 @@
 
   // ── Custom Inscan at Hub Modal Logic ────────────────────────
 
-  function hideInscanOverlay() {
+  function hideInscanOverlay(triggerReload = true) {
     const overlay = document.querySelector('.chrono-iframe-overlay');
     if (overlay) {
       overlay.style.opacity = '0';
       overlay.style.pointerEvents = 'none';
+    }
+    if (triggerReload) {
+      setTimeout(() => {
+        const reloadBtn = document.querySelector('button .anticon-reload')?.closest('button');
+        if (reloadBtn) {
+          reloadBtn.click();
+        }
+      }, 300);
     }
   }
 
@@ -726,7 +753,10 @@
     if (!location.pathname.includes("/ops/reconciliation/recon/")) return;
     
     const buttons = Array.from(document.querySelectorAll('button'));
-    const reconcileBtn = buttons.find(b => b.textContent.trim() === 'Reconcile');
+    const settleBtn = buttons.find(b => {
+      const text = b.textContent.trim().toLowerCase();
+      return text === 'settle' || text === 'reconcile' || text === 'réconcilier' || text === 'reconcilier' || text === 'régler' || text === 'regler' || text === 'settlement';
+    });
     const cancelBtn = buttons.find(b => b.textContent.trim() === 'Cancel');
     const reloadBtn = buttons.find(b => b.querySelector('.anticon-reload'));
     
@@ -736,30 +766,45 @@
         toastShownForUrl = null;
       });
     }
-    
-    if (reconcileBtn && !document.querySelector('.chrono-inscan-ext-btn')) {
-      const container = reconcileBtn.parentElement;
+
+    if (settleBtn && !document.querySelector('.chrono-inscan-ext-btn')) {
+      const container = settleBtn.parentElement;
       const inscanBtn = document.createElement('button');
       
-      if (cancelBtn) {
-        inscanBtn.className = cancelBtn.className;
-        inscanBtn.classList.add('chrono-inscan-ext-btn');
-      } else {
-        inscanBtn.className = "ant-btn chrono-inscan-ext-btn";
-        inscanBtn.style.color = "#1890ff";
-        inscanBtn.style.borderColor = "#1890ff";
-        inscanBtn.style.background = "#f0f7ff";
+      inscanBtn.type = "button";
+      inscanBtn.className = "ant-btn ant-btn-primary chrono-inscan-ext-btn";
+      inscanBtn.style.background = "#1890ff";
+      inscanBtn.style.borderColor = "#1890ff";
+      inscanBtn.style.color = "#ffffff";
+      inscanBtn.style.fontWeight = "bold";
+      inscanBtn.style.marginRight = "8px";
+      inscanBtn.innerHTML = `<span>📥 Inscan at Hub</span>`;
+      
+      // Sequence logic: Inscan at Hub is the first button; Settle button is revealed after Inscan is clicked
+      const inscanStorageKey = 'chrono_inscan_clicked_' + location.pathname;
+      const alreadyInscanned = sessionStorage.getItem(inscanStorageKey) === 'true';
+
+      if (!alreadyInscanned) {
+        settleBtn.dataset.chronoOriginalDisplay = settleBtn.style.display || '';
+        settleBtn.style.display = 'none'; // Settle button hidden until Inscan at Hub is clicked
       }
       
-      inscanBtn.style.marginRight = "8px";
-      inscanBtn.innerHTML = `<span>Inscan at Hub</span>`;
-      
-      container.insertBefore(inscanBtn, reconcileBtn.previousElementSibling || reconcileBtn);
+      // Place Inscan button as the FIRST button (before Settle)
+      container.insertBefore(inscanBtn, settleBtn);
       
       inscanBtn.addEventListener('click', (e) => {
         e.preventDefault();
         e.stopPropagation();
         
+        sessionStorage.setItem(inscanStorageKey, 'true');
+        
+        // Reveal Settle button after Inscan is clicked
+        settleBtn.style.display = settleBtn.dataset.chronoOriginalDisplay || '';
+        settleBtn.classList.add('chrono-settle-revealed');
+
+        // Check delivered parcels once for COD settlement
+        ensureDeliveredParcelsChecked(true);
+
         const overlay = document.querySelector('.chrono-iframe-overlay');
         if (overlay) {
           showInscanOverlay();
@@ -769,6 +814,60 @@
       });
     }
   }
+
+  // Ensures that delivered parcels in the reconciliation table are checked for COD settlement
+  let lastCheckedReconUrl = null;
+  function ensureDeliveredParcelsChecked(force = false) {
+    if (!location.pathname.includes("/ops/reconciliation/recon/")) return;
+    if (!force && lastCheckedReconUrl === location.pathname) return;
+
+    try {
+      const rows = document.querySelectorAll('.ant-table-tbody tr.ant-table-row, tbody tr.ant-table-row');
+      let deliveredCount = 0;
+
+      rows.forEach(row => {
+        const text = row.textContent || "";
+        const isDelivered = text.includes("Delivered") || text.includes("Livré") || text.includes("Livre");
+        const isUndelivered = text.includes("Undelivered") || text.includes("Non livré") || text.includes("Attempted") || text.includes("Échoué");
+
+        if (isDelivered && !isUndelivered) {
+          deliveredCount++;
+          const cb = row.querySelector('.ant-checkbox-input, input[type="checkbox"]');
+          const wrapper = row.querySelector('.ant-checkbox, label.ant-checkbox-wrapper') || cb;
+          if (cb && !cb.checked && wrapper) {
+            wrapper.click();
+          }
+        }
+      });
+
+      if (deliveredCount > 0) {
+        lastCheckedReconUrl = location.pathname;
+      }
+
+      // Verification badge near balance
+      const balanceHeader = document.querySelector('.Component-balanceHeader-0-3-515, .Component-settleBalance-0-3-513, [class*="balanceHeader"]');
+      if (balanceHeader && !document.getElementById('chrono-all-delivered-badge')) {
+        const badge = document.createElement('div');
+        badge.id = 'chrono-all-delivered-badge';
+        badge.style.display = 'inline-flex';
+        badge.style.alignItems = 'center';
+        badge.style.gap = '6px';
+        badge.style.marginTop = '6px';
+        badge.style.padding = '4px 10px';
+        badge.style.backgroundColor = '#f6ffed';
+        badge.style.border = '1px solid #b7eb8f';
+        badge.style.borderRadius = '4px';
+        badge.style.color = '#389e0d';
+        badge.style.fontSize = '12px';
+        badge.style.fontWeight = '500';
+        badge.innerHTML = `<span>✔ Tous les colis livrés cochés pour règlement complet</span>`;
+        balanceHeader.parentElement?.appendChild(badge);
+      }
+    } catch (e) {
+      console.warn('[ChronoExt] Error checking delivered parcels:', e);
+    }
+  }
+
 
 
 
@@ -867,6 +966,7 @@
       });
     }
   }
+
 
   async function fetchCompletedRiders() {
     if (!apiTokens) {
@@ -1321,6 +1421,8 @@
     if (lower === 'walid aichi' || lower === 'omar') return 'omar';
     if (lower === 'abd assamad krim' || lower === 'sami') return 'sami';
     if (lower === 'badr hachimi' || lower === 'bader hachimi') return 'bader hachimi';
+    if (lower.includes('yourja') || lower.includes('mouhcine')) return 'mouhcine yourja';
+    if (lower.includes('bahadi') || lower === 'abderrahmane bahadi' || lower === 'bahadi abderrahmane') return 'abderrahmane bahadi';
 
     return lower;
   }
@@ -1443,8 +1545,24 @@
         const summaryRaw = await getTripTaskSummary(tripId);
         const summary = parseTaskSummary(summaryRaw);
 
-        if (canonicalDriver.includes('hachimi') || canonicalDriver.includes('bader') || canonicalDriver.includes('omar')) {
-          console.log(`[ChronoExt] Trip ${tripId} (${rawDriver} -> ${canonicalDriver}): Delivered=${summary.delivered}, Undelivered=${summary.undelivered}, Total=${trip.total_task_count}`);
+        const delivered = summary.delivered;
+        const undelivered = summary.undelivered;
+        const pickupCompleted = summary.pickupCompleted; // Only pickups that were actually completed/picked up
+        const pendingDelivery = summary.pendingDelivery;
+
+        // Only calculate actual handled parcels/pickups. If it was not picked up, do not calculate it.
+        const handledTotal = delivered + undelivered + pickupCompleted + pendingDelivery;
+        const totalFromApi = Number(trip.total_shipment_count || trip.total_task_count || 0);
+
+        // When task summary is parsed, use handledTotal directly to exclude unpicked items (notPickedUp / pendingPickup).
+        // Fallback to API total (minus unpicked items) if handledTotal is 0.
+        const total = handledTotal > 0
+          ? handledTotal
+          : Math.max(0, totalFromApi - (summary.notPickedUp || 0) - (summary.pendingPickup || 0));
+
+        if (canonicalDriver.includes('hachimi') || canonicalDriver.includes('bader') || canonicalDriver.includes('omar') || canonicalDriver.includes('yourja') || canonicalDriver.includes('mouhcine') || canonicalDriver.includes('bahadi')) {
+          const tripRef = trip.organisation_reference_number || trip.trip_reference_number || tripId;
+          console.log(`[ChronoExt] Trip ${tripRef} ("${rawDriver}" -> ${canonicalDriver}): Delivered=${delivered}, Undelivered=${undelivered}, TotalCalculated=${total}`);
         }
 
         if (!stats.has(canonicalDriver)) {
@@ -1458,17 +1576,6 @@
           });
         }
         const s = stats.get(canonicalDriver);
-
-        const delivered = summary.delivered;
-        const undelivered = summary.undelivered;
-        const pickupCompleted = summary.pickupCompleted;
-        const pendingDelivery = summary.pendingDelivery;
-        const pendingPickup = summary.pendingPickup;
-        const notPickedUp = summary.notPickedUp;
-
-        const summarySum = delivered + undelivered + pickupCompleted + pendingDelivery + pendingPickup + notPickedUp;
-        const totalFromApi = Number(trip.total_task_count || trip.total_shipment_count || 0);
-        const total = totalFromApi > 0 ? totalFromApi : ((summary.total !== null && summary.total > 0) ? summary.total : summarySum);
 
         s.totalParcels += total;
         s.delivered += delivered + pickupCompleted;  // Completed pickups count as delivered
@@ -1748,6 +1855,7 @@
     ensureDefaultFilters();
     ensureSalaryExportButton();
     ensureStatusUpdateUI();
+    ensureSettlementMenu();
     
     const modal = getScanModal(document);
     if (modal && !modalObserver) {
@@ -1770,6 +1878,8 @@
     ensureDefaultFilters();
     ensureSalaryExportButton();
     ensureStatusUpdateUI();
+    ensureSettlementMenu();
+
     
     const modal = getScanModal(document);
     if (modal) {
@@ -1784,6 +1894,733 @@
     }
   }, 1000);
 
+  // ── Rider Settlement Menu & Modal ────────────────────
+
+  function ensureSettlementMenu() {
+    const drawer = document.querySelector('.ant-drawer-open');
+    const existingMenuItem = document.querySelector('.chrono-ext-settlement-menu-item');
+
+    // If the drawer is closed, clean up any menu item
+    if (!drawer) {
+      if (existingMenuItem) existingMenuItem.remove();
+      return;
+    }
+
+    // Search specifically for Financial Operations submenu items inside the open drawer
+    const drawerItems = Array.from(drawer.querySelectorAll('.ant-menu-item'));
+    let financeAnchorItem = null;
+
+    for (const item of drawerItems) {
+      if (item.classList.contains('chrono-ext-settlement-menu-item')) continue;
+
+      const link = item.querySelector('a');
+      const href = link ? (link.getAttribute('href') || '') : '';
+      const menuId = item.getAttribute('data-menu-id') || '';
+      const text = (item.textContent || '').trim();
+
+      // Strictly identify Financial Operations sub-items
+      const isFinanceSubItem = 
+        href.includes('/ops/reconciliation/rider-list') ||
+        href.includes('/ops/transactionsHistory') ||
+        menuId.includes('riderReconciliation') ||
+        menuId.includes('transactionsHistory') ||
+        text === 'Rider Reconciliation' ||
+        text === 'Transactions History' ||
+        text === 'Historique des transactions';
+
+      if (isFinanceSubItem) {
+        financeAnchorItem = item;
+        break;
+      }
+    }
+
+    // If Financial Operations is NOT the active menu, remove our item immediately
+    if (!financeAnchorItem) {
+      if (existingMenuItem) existingMenuItem.remove();
+      return;
+    }
+
+    const parentList = financeAnchorItem.closest('ul');
+    if (!parentList) return;
+
+    // If it's already in the correct parent list, do nothing
+    if (existingMenuItem) {
+      if (existingMenuItem.parentElement === parentList) {
+        return;
+      } else {
+        existingMenuItem.remove();
+      }
+    }
+
+    // Insert strictly into the Financial Operations submenu
+    const newItem = document.createElement('li');
+    newItem.className = 'ant-menu-item chrono-ext-settlement-menu-item';
+    newItem.setAttribute('role', 'menuitem');
+    newItem.setAttribute('tabindex', '-1');
+    newItem.style.paddingLeft = financeAnchorItem.style.paddingLeft || '24px';
+    
+    newItem.innerHTML = `
+      <span role="img" class="anticon">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M12 2v20M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"></path>
+        </svg>
+      </span>
+      <span class="ant-menu-title-content">
+        <span>Rider Settlement Amounts</span>
+      </span>
+    `;
+
+    financeAnchorItem.parentNode.insertBefore(newItem, financeAnchorItem.nextSibling);
+
+    newItem.addEventListener('click', (e) => {
+      e.preventDefault();
+      e.stopPropagation();
+
+      const mask = document.querySelector('.ant-drawer-mask');
+      if (mask) mask.click();
+
+      showRiderSettlementModal();
+    });
+  }
+
+  function showRiderSettlementModal() {
+    const existing = document.querySelector('.chrono-ext-settlement-overlay');
+    if (existing) existing.remove();
+
+    const today = new Date();
+    const todayStr = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`;
+    let currentRiders = [];
+
+    const overlay = document.createElement('div');
+    overlay.className = 'chrono-ext-month-modal-overlay chrono-ext-settlement-overlay';
+    overlay.innerHTML = `
+      <div class="chrono-ext-month-modal" style="width: 720px; max-width: 95vw;">
+        <div class="chrono-ext-month-modal-header">
+          <div style="display:flex; align-items:center; gap:8px;">
+            <span style="font-size:18px;">💰</span>
+            <h3 style="margin:0; font-size:16px;">Rider Settlement Amounts (Règlements)</h3>
+          </div>
+          <span class="chrono-ext-month-modal-close">×</span>
+        </div>
+        <div class="chrono-ext-month-modal-body">
+          <div style="display:flex; justify-content:space-between; align-items:flex-end; gap:12px; margin-bottom:16px;">
+            <div style="flex:1;">
+              <label style="display:block; margin-bottom:6px; font-weight:500; font-size:13px; color:#595959;">Date de règlement :</label>
+              <input type="date" id="chrono-settlement-date" class="chrono-ext-settlement-date-input" value="${todayStr}" max="${todayStr}" style="width:100%;">
+            </div>
+            <div style="display:flex; gap:8px;">
+              <button class="ant-btn chrono-status-btn" id="chrono-settlement-fetch-btn" style="min-width:110px; height:36px;">
+                <span>Vérifier</span>
+              </button>
+              <button class="ant-btn" id="chrono-settlement-export-btn" disabled style="height:36px; display:inline-flex; align-items:center; gap:6px; border-radius:6px;">
+                <span>📥 Exporter Excel</span>
+              </button>
+            </div>
+          </div>
+
+          <div id="chrono-settlement-filter-box" style="display:none; margin-bottom:12px;">
+            <input type="text" id="chrono-settlement-search" placeholder="🔍 Filtrer par nom ou code livreur..." style="width:100%; height:32px; padding:0 10px; border:1px solid #d9d9d9; border-radius:6px; font-size:13px;">
+          </div>
+          
+          <div class="chrono-ext-month-modal-progress" id="chrono-settlement-progress" style="display:none; margin-bottom:16px;">
+            <div class="chrono-ext-progress-bar"><div class="chrono-ext-progress-fill" style="width:100%"></div></div>
+            <span class="chrono-ext-progress-text">Récupération des données de règlement...</span>
+          </div>
+
+          <div id="chrono-settlement-results" style="max-height: 440px; overflow-y: auto; border: 1px solid #f0f0f0; border-radius: 6px; display: none;">
+            <table class="chrono-ext-settlement-table">
+              <thead style="position: sticky; top: 0; z-index: 2;">
+                <tr>
+                  <th style="text-align: left;">Livreur</th>
+                  <th style="text-align: center; width: 90px;">Code</th>
+                  <th style="text-align: center; width: 80px;">Colis</th>
+                  <th style="text-align: right; width: 140px;">Montant Réglé</th>
+                  <th style="text-align: center; width: 80px;">Détails</th>
+                </tr>
+              </thead>
+              <tbody id="chrono-settlement-tbody">
+              </tbody>
+              <tfoot style="position: sticky; bottom: 0; z-index: 2;">
+                <tr>
+                  <td colspan="2" style="text-align: left;">Total Hub</td>
+                  <td id="chrono-settlement-total-count" style="text-align: center;">0</td>
+                  <td id="chrono-settlement-total-amount" style="text-align: right; color: #52c41a; font-size: 14px;">0.00 MAD</td>
+                  <td></td>
+                </tr>
+              </tfoot>
+            </table>
+          </div>
+        </div>
+      </div>
+    `;
+
+    document.body.appendChild(overlay);
+
+    const closeModal = () => overlay.remove();
+    overlay.querySelector('.chrono-ext-month-modal-close').addEventListener('click', closeModal);
+    overlay.addEventListener('click', (e) => { if (e.target === overlay) closeModal(); });
+
+    const fetchBtn = overlay.querySelector('#chrono-settlement-fetch-btn');
+    const exportBtn = overlay.querySelector('#chrono-settlement-export-btn');
+    const dateInput = overlay.querySelector('#chrono-settlement-date');
+    const searchInput = overlay.querySelector('#chrono-settlement-search');
+    const filterBox = overlay.querySelector('#chrono-settlement-filter-box');
+    const progress = overlay.querySelector('#chrono-settlement-progress');
+    const results = overlay.querySelector('#chrono-settlement-results');
+    const tbody = overlay.querySelector('#chrono-settlement-tbody');
+    const totalCountEl = overlay.querySelector('#chrono-settlement-total-count');
+    const totalAmountEl = overlay.querySelector('#chrono-settlement-total-amount');
+
+    function renderTable(filterQuery = '') {
+      tbody.innerHTML = '';
+      const query = filterQuery.toLowerCase().trim();
+
+      const filtered = currentRiders.filter(r => 
+        !query || 
+        r.name.toLowerCase().includes(query) || 
+        (r.code && r.code.toLowerCase().includes(query))
+      );
+
+      let totalCount = 0;
+      let totalAmt = 0;
+
+      if (filtered.length === 0) {
+        tbody.innerHTML = `<tr><td colspan="5" style="padding: 24px; text-align: center; color: #888;">${currentRiders.length === 0 ? 'Aucun règlement trouvé pour cette date.' : 'Aucun résultat correspondant.'}</td></tr>`;
+      } else {
+        filtered.forEach((item, idx) => {
+          totalCount += (item.deliveredCount || item.count || 0);
+          totalAmt += item.amount;
+
+          const reconciledByList = Array.from(new Set((item.parcels || []).map(p => p.employee_name).filter(Boolean))).join(', ') || item.cashier || 'N.A.';
+
+          const tr = document.createElement('tr');
+          tr.style.cursor = 'pointer';
+          tr.innerHTML = `
+            <td>
+              <strong>${item.name}</strong>
+              <div style="font-size:11px; color:#888; margin-top:2px;">Reconciled: <span style="color:#262626; font-weight:500;">${reconciledByList}</span></div>
+            </td>
+            <td style="text-align: center;"><span style="background:#f5f5f5; padding:2px 6px; border-radius:4px; font-size:12px; font-family:monospace;">${item.code || '-'}</span></td>
+            <td style="text-align: center;">
+              <span style="background:#e6f7ff; color:#1890ff; padding:2px 8px; border-radius:10px; font-weight:600; font-size:12px;" title="${item.deliveredCount || item.count} Livrés / ${item.undeliveredCount || 0} Non livrés">
+                ${item.deliveredCount || item.count} livrés
+              </span>
+              ${item.undeliveredCount > 0 ? `<div style="font-size:11px; color:#ff4d4f; margin-top:2px; font-weight:500;">${item.undeliveredCount} non-livrés</div>` : ''}
+            </td>
+            <td style="text-align: right; font-weight: 600; color: #262626;">
+              ${item.amount.toFixed(2)} MAD
+              ${item.status === 'in_transit' ? '<div style="font-size:10px; color:#fa8c16; font-weight:normal;">En course</div>' : ''}
+            </td>
+            <td style="text-align: center;"><button class="ant-btn ant-btn-sm chrono-details-toggle" style="font-size:11px; height:24px; padding:0 8px;">Détails</button></td>
+          `;
+
+          // Sub-row for detailed parcel breakdown
+          const subTr = document.createElement('tr');
+          subTr.style.display = 'none';
+          subTr.style.backgroundColor = '#fafafa';
+
+          subTr.innerHTML = `
+            <td colspan="5" style="padding: 12px 16px;">
+              <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:8px; flex-wrap:wrap; gap:8px;">
+                <div style="font-weight:600; font-size:13px; color:#262626;">
+                  Colis pour ${item.name} (<span class="chrono-sub-count">${item.deliveredCount || item.count} livrés</span>${item.undeliveredCount > 0 ? `, <span style="color:#ff4d4f;">${item.undeliveredCount} non-livrés</span>` : ''}) :
+                </div>
+                <div class="chrono-sub-filter-buttons" style="display:flex; gap:6px;">
+                  <button class="ant-btn ant-btn-sm chrono-btn-filter-all" style="font-size:11px; height:24px; padding:0 8px; background:#1890ff; color:#fff; border-color:#1890ff;">Tous</button>
+                  <button class="ant-btn ant-btn-sm chrono-btn-filter-del" style="font-size:11px; height:24px; padding:0 8px;">Livrés</button>
+                  <button class="ant-btn ant-btn-sm chrono-btn-filter-undel" style="font-size:11px; height:24px; padding:0 8px;">Non-livrés</button>
+                </div>
+              </div>
+              <div class="chrono-sub-parcels-container" style="max-height:220px; overflow-y:auto; background:#fff; border:1px solid #e8e8e8; border-radius:6px; padding:4px;">
+                <div style="text-align:center; padding:16px; color:#888;">Chargement des colis...</div>
+              </div>
+            </td>
+          `;
+
+          const container = subTr.querySelector('.chrono-sub-parcels-container');
+          let currentParcelsView = [];
+
+          function renderSubParcels(filterType = 'all') {
+            let list = currentParcelsView;
+            if (filterType === 'del') list = list.filter(p => p.isDelivered);
+            if (filterType === 'undel') list = list.filter(p => !p.isDelivered);
+
+            if (list.length === 0) {
+              container.innerHTML = `<div style="text-align:center; padding:16px; color:#888;">Aucun colis dans cette vue.</div>`;
+              return;
+            }
+
+            container.innerHTML = list.map(p => `
+              <div style="display:flex; justify-content:space-between; align-items:center; padding:6px 10px; border-bottom:1px solid #f0f0f0; font-size:12px;">
+                <div style="display:flex; align-items:center; gap:8px;">
+                  <span style="font-family:monospace; color:#1890ff; font-weight:600; font-size:13px;">${p.reference_number}</span>
+                  <button class="chrono-copy-cn-btn" data-cn="${p.reference_number}" title="Copier le code" style="cursor:pointer; border:1px solid #d9d9d9; background:#fff; border-radius:4px; padding:1px 5px; font-size:11px;">📋 Copier</button>
+                  ${p.isDelivered 
+                    ? '<span style="background:#f6ffed; color:#52c41a; border:1px solid #b7eb8f; padding:1px 6px; border-radius:4px; font-size:11px;">✔ Livré</span>' 
+                    : `<span style="background:#fff1f0; color:#ff4d4f; border:1px solid #ffa39e; padding:1px 6px; border-radius:4px; font-size:11px;">✖ ${p.failure_reason || 'Non livré'}</span>`}
+                </div>
+                <div style="display:flex; align-items:center; gap:12px;">
+                  ${p.customer_name ? `<span style="color:#595959; font-size:11px; max-width:180px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">${p.customer_name}</span>` : ''}
+                  <span style="font-weight:600; color:${p.amount > 0 ? '#52c41a' : '#8c8c8c'}; min-width:80px; text-align:right;">
+                    ${p.amount > 0 ? `${p.amount.toFixed(2)} MAD` : '0.00 MAD'}
+                  </span>
+                </div>
+              </div>
+            `).join('');
+
+            // Attach copy event listeners
+            container.querySelectorAll('.chrono-copy-cn-btn').forEach(btn => {
+              btn.addEventListener('click', (e) => {
+                e.stopPropagation();
+                const cn = btn.getAttribute('data-cn');
+                if (cn) {
+                  navigator.clipboard.writeText(cn).then(() => {
+                    const orig = btn.textContent;
+                    btn.textContent = '✔ Copié !';
+                    btn.style.color = '#52c41a';
+                    setTimeout(() => {
+                      btn.textContent = orig;
+                      btn.style.color = '';
+                    }, 1500);
+                  });
+                }
+              });
+            });
+          }
+
+          // Sub-filter tabs
+          const btnAll = subTr.querySelector('.chrono-btn-filter-all');
+          const btnDel = subTr.querySelector('.chrono-btn-filter-del');
+          const btnUndel = subTr.querySelector('.chrono-btn-filter-undel');
+
+          const setSubFilterActive = (activeBtn) => {
+            [btnAll, btnDel, btnUndel].forEach(b => {
+              b.style.background = '#fff';
+              b.style.color = '#595959';
+              b.style.borderColor = '#d9d9d9';
+            });
+            activeBtn.style.background = '#1890ff';
+            activeBtn.style.color = '#fff';
+            activeBtn.style.borderColor = '#1890ff';
+          };
+
+          btnAll.addEventListener('click', (e) => {
+            e.stopPropagation();
+            setSubFilterActive(btnAll);
+            renderSubParcels('all');
+          });
+          btnDel.addEventListener('click', (e) => {
+            e.stopPropagation();
+            setSubFilterActive(btnDel);
+            renderSubParcels('del');
+          });
+          btnUndel.addEventListener('click', (e) => {
+            e.stopPropagation();
+            setSubFilterActive(btnUndel);
+            renderSubParcels('undel');
+          });
+
+          const loadTripParcels = async () => {
+            if (item.detailsLoaded) return;
+            try {
+              let parcels = [];
+              const refs = (item.tripRefs && item.tripRefs.length > 0) ? item.tripRefs : (item.code ? [item.code] : []);
+              for (const ref of refs) {
+                if (ref && ref !== 'RECON' && ref !== '-') {
+                  const fetched = await fetchTripConsignmentsApi(ref);
+                  parcels.push(...fetched);
+                }
+              }
+
+              // Also merge any parcels recorded in reconciliation ledger that were missing
+              if (item.parcels && item.parcels.length > 0) {
+                item.parcels.forEach(p => {
+                  const exists = parcels.some(existing => existing.reference_number === (p.reference_number || p.id));
+                  if (!exists) {
+                    parcels.push({
+                      reference_number: p.reference_number || p.id,
+                      isDelivered: true,
+                      amount: p.amount || 0,
+                      customer_name: p.employee_name ? `Reconciled: ${p.employee_name}` : '',
+                      failure_reason: ''
+                    });
+                  }
+                });
+              }
+
+              item.detailedParcels = parcels;
+              item.detailsLoaded = true;
+              currentParcelsView = parcels;
+              renderSubParcels('all');
+            } catch (err) {
+              container.innerHTML = `<div style="text-align:center; padding:16px; color:#ff4d4f;">Erreur lors du chargement des colis (${err.message})</div>`;
+            }
+          };
+
+          const toggleDetails = () => {
+            const isVisible = subTr.style.display !== 'none';
+            subTr.style.display = isVisible ? 'none' : 'table-row';
+            const btn = tr.querySelector('.chrono-details-toggle');
+            if (btn) btn.textContent = isVisible ? 'Détails' : 'Masquer';
+            if (!isVisible && !item.detailsLoaded) {
+              loadTripParcels();
+            }
+          };
+
+          tr.addEventListener('click', (e) => {
+            toggleDetails();
+          });
+
+          tbody.appendChild(tr);
+          tbody.appendChild(subTr);
+        });
+      }
+
+      totalCountEl.textContent = totalCount;
+      totalAmountEl.textContent = `${totalAmt.toFixed(2)} MAD`;
+    }
+
+    searchInput.addEventListener('input', (e) => {
+      renderTable(e.target.value);
+    });
+
+    fetchBtn.addEventListener('click', async () => {
+      const selectedDate = dateInput.value;
+      if (!selectedDate) return;
+
+      fetchBtn.disabled = true;
+      exportBtn.disabled = true;
+      progress.style.display = 'block';
+      results.style.display = 'none';
+      filterBox.style.display = 'none';
+
+      try {
+        currentRiders = await fetchRiderSettlementsApi(selectedDate);
+        currentRiders.sort((a, b) => b.amount - a.amount);
+        
+        renderTable();
+
+        results.style.display = 'block';
+        if (currentRiders.length > 0) {
+          filterBox.style.display = 'block';
+          exportBtn.disabled = false;
+        }
+      } catch (err) {
+        console.error("[ChronoExt] Settlement Fetch Error:", err);
+        tbody.innerHTML = `<tr><td colspan="5" style="padding: 24px; text-align: center; color: #ef4444;">
+          Erreur lors du chargement (${err.message}).<br>
+          <small style="color:#888;">Vérifiez votre connexion et rechargez la page si nécessaire.</small>
+        </td></tr>`;
+        results.style.display = 'block';
+      } finally {
+        fetchBtn.disabled = false;
+        progress.style.display = 'none';
+      }
+    });
+
+    exportBtn.addEventListener('click', async () => {
+      if (!currentRiders || currentRiders.length === 0) return;
+      if (typeof XLSX === 'undefined') {
+        alert("Bibliothèque XLSX non disponible.");
+        return;
+      }
+      const wb = XLSX.utils.book_new();
+
+      // Sheet 1: Summary per rider
+      const wsSummaryData = [
+        ["Livreur", "N° Course", "Colis Livrés", "Colis Non-Livrés", "Total Colis", "Montant Règlement (MAD)", "Reconciled By", "Statut Course"],
+        ...currentRiders.map(d => [
+          d.name,
+          d.code,
+          d.deliveredCount || d.count,
+          d.undeliveredCount || 0,
+          d.totalCount || d.count,
+          d.amount,
+          d.cashier || Array.from(new Set((d.parcels || []).map(p => p.employee_name).filter(Boolean))).join(', ') || 'N.A.',
+          d.status === 'in_transit' ? 'En course' : 'Terminée'
+        ]),
+        ["TOTAL HUB", "", parseInt(totalCountEl.textContent, 10), "", "", parseFloat(totalAmountEl.textContent), "", ""]
+      ];
+      const wsSummary = XLSX.utils.aoa_to_sheet(wsSummaryData);
+      XLSX.utils.book_append_sheet(wb, wsSummary, "Synthèse Règlements");
+
+      // Sheet 2: Detailed parcels list (from loaded parcels or reconnaissance)
+      const wsParcelsData = [
+        ["N° Expédition (CN)", "Livreur", "N° Course", "Statut", "Montant CRBT (MAD)", "Client", "Motif Échec"]
+      ];
+      currentRiders.forEach(r => {
+        const pList = r.detailedParcels || r.parcels || [];
+        pList.forEach(p => {
+          wsParcelsData.push([
+            p.reference_number || p.id,
+            r.name,
+            r.code,
+            p.isDelivered ? 'Livré' : 'Non-livré',
+            p.amount || 0,
+            p.customer_name || '',
+            p.failure_reason || ''
+          ]);
+        });
+      });
+      const wsParcels = XLSX.utils.aoa_to_sheet(wsParcelsData);
+      XLSX.utils.book_append_sheet(wb, wsParcels, "Détail Colis");
+
+      XLSX.writeFile(wb, `Reglements_Livreurs_${dateInput.value}.xlsx`);
+    });
+  }
+
+  async function fetchTripConsignmentsApi(tripRef) {
+    if (!apiTokens || !tripRef || tripRef === '-') return [];
+    let url = `https://projectxeuapi.shipsy.io/api/retaildashboard/tripdetails/get?searchBy=organisation_reference_number&searchKey=${tripRef}&timezone=Africa/Casablanca`;
+    try {
+      let res = await fetch(url, {
+        method: "GET",
+        headers: {
+          ...apiTokens,
+          "Accept": "application/json"
+        }
+      });
+      if (!res.ok) {
+        url = `https://projectxeuapi.shipsy.io/api/retaildashboard/tripdetails/get?searchBy=trip_reference_number&searchKey=${tripRef}&timezone=Africa/Casablanca`;
+        res = await fetch(url, {
+          method: "GET",
+          headers: { ...apiTokens, "Accept": "application/json" }
+        });
+      }
+      if (!res.ok) return [];
+      const json = await res.json();
+      const cnDetails = json.data?.consignmentDetails;
+      const completeCns = cnDetails?.complete || [];
+      const incompleteCns = cnDetails?.incomplete || [];
+      let all = [...completeCns, ...incompleteCns];
+
+      if (all.length === 0 && json.data?.taskDetails) {
+        const td = json.data.taskDetails;
+        all = [...(td.complete || []), ...(td.incomplete || [])];
+      }
+
+      return all.map(c => {
+        const inTripStatus = c.consignment_in_trip_status || '';
+        const taskStatus = c.task_status || '';
+        const st = c.consignment_status || c.status || '';
+        const isDelivered = (inTripStatus && inTripStatus.toLowerCase() === 'delivered')
+            || (taskStatus && taskStatus.toLowerCase() === 'success')
+            || st.toLowerCase() === 'delivered'
+            || st.toLowerCase() === 'rto_delivered'
+            || st.toLowerCase() === 'success';
+
+        const cod = Number(c.cod_amount || c.amount || c.cod_value || 0);
+        const failureReason = c.delivery_failure_reason || c.failure_reason || '';
+        return {
+          reference_number: c.reference_number || c.consignment_reference_number || c.hu_number || c.id,
+          isDelivered,
+          amount: cod,
+          customer_name: c.customer_name || '',
+          address: c.receiver_address || '',
+          failure_reason: failureReason
+        };
+      });
+    } catch (e) {
+      console.warn(`[ChronoExt] Error loading consignments for ${tripRef}:`, e);
+      return [];
+    }
+  }
+
+  async function fetchRiderSettlementsApi(dateStr) {
+    if (!apiTokens) throw new Error("Tokens d'API non capturés. Veuillez recharger la page.");
+
+    const tripUrl = "https://projectxeuapi.shipsy.io/api/retaildashboard/tripmanager/get";
+    const reconUrl = "https://projectxeuapi.shipsy.io/api/Dashboard/riderReconciliation/getReconciliationData";
+    
+    // Parse date into DD/MM/YYYY
+    const [year, month, day] = dateStr.split('-');
+    const dmyStr = `${day}/${month}/${year}`;
+
+    // 1. Fetch trips from Trip Manager for the selected date
+    let allTrips = [];
+    try {
+      const [compRes, transitRes] = await Promise.all([
+        fetch(tripUrl, {
+          method: "POST",
+          headers: { ...apiTokens, "Content-Type": "application/json" },
+          body: JSON.stringify({
+            from_date: dateStr,
+            to_date: dateStr,
+            hub_id: "2477050730750414061",
+            bucket: "retail_completed"
+          })
+        }),
+        fetch(tripUrl, {
+          method: "POST",
+          headers: { ...apiTokens, "Content-Type": "application/json" },
+          body: JSON.stringify({
+            from_date: dateStr,
+            to_date: dateStr,
+            hub_id: "2477050730750414061",
+            bucket: "retail_in_transit"
+          })
+        })
+      ]);
+
+      if (compRes.ok) {
+        const compJson = await compRes.json();
+        const pData = compJson.data?.page_data || compJson.data?.pageData || [];
+        allTrips.push(...pData);
+      }
+      if (transitRes.ok) {
+        const transitJson = await transitRes.json();
+        const pData = transitJson.data?.page_data || transitJson.data?.pageData || [];
+        allTrips.push(...pData);
+      }
+    } catch (err) {
+      console.warn("[ChronoExt] Failed to fetch trips from tripmanager:", err);
+    }
+
+    // 2. Fetch settlement transactions from Reconciliation ledger
+    let allSettlements = [];
+    const seenIds = new Set();
+
+    try {
+      for (let pNo = 1; pNo <= 5; pNo++) {
+        const reconPayload = {
+          startDate: null,
+          endDate: null,
+          hubList: ["2477050730750414061"],
+          pageNo: pNo,
+          resultsPerPage: 100,
+          cashSource: "ALL"
+        };
+        const reconRes = await fetch(reconUrl, {
+          method: "POST",
+          headers: { ...apiTokens, "Content-Type": "application/json" },
+          body: JSON.stringify(reconPayload)
+        });
+
+        if (!reconRes.ok) break;
+        const reconJson = await reconRes.json();
+        const rList = reconJson.data?.reconciliationData || reconJson.data?.page_data || [];
+        if (rList.length === 0) break;
+
+        let hasOlderDate = false;
+        rList.forEach(item => {
+          const creditType = (item.credit_type || '').toLowerCase();
+          if (creditType !== 'settlement') return;
+
+          const created = item.created_at || '';
+          if (created.includes(dmyStr) || created.includes(dateStr) || !created) {
+            const id = item.id || `${item.reference_number}_${created}_${item.amount}`;
+            if (!seenIds.has(id)) {
+              seenIds.add(id);
+              allSettlements.push(item);
+            }
+          } else {
+            hasOlderDate = true;
+          }
+        });
+
+        if (hasOlderDate && pNo > 1) break;
+      }
+    } catch (err) {
+      console.warn("[ChronoExt] Failed to fetch reconciliation data:", err);
+    }
+
+    // 3. Build unified rider list
+    const riderMap = {};
+
+    function getCanonicalName(raw) {
+      return (raw || '').toLowerCase().replace(/[^a-z0-9]/g, ' ').replace(/\s+/g, ' ').trim();
+    }
+
+    // A. Populate from Trip Manager (Official source of task counts)
+    allTrips.forEach(t => {
+      const driverName = (t.extra_details?.driver_name || t.worker_name || 'Livreur').trim();
+      const tripRef = t.organisation_reference_number || t.trip_reference_number || 'MOH';
+      const key = getCanonicalName(driverName) || tripRef.toLowerCase();
+
+      if (!riderMap[key]) {
+        riderMap[key] = {
+          name: driverName,
+          code: tripRef,
+          tripRefs: [tripRef],
+          deliveredCount: 0,
+          undeliveredCount: 0,
+          totalCount: 0,
+          status: t.status || 'completed',
+          tripCredits: 0,
+          settledAmount: 0,
+          amount: 0,
+          cashier: null,
+          parcels: [],
+          detailsLoaded: false
+        };
+      } else {
+        if (tripRef && !riderMap[key].tripRefs.includes(tripRef)) {
+          riderMap[key].tripRefs.push(tripRef);
+        }
+      }
+
+      riderMap[key].deliveredCount += (t.delivered_task_count || 0);
+      riderMap[key].undeliveredCount += (t.attempted_task_count || 0);
+      riderMap[key].totalCount += (t.total_task_count || ((t.delivered_task_count || 0) + (t.attempted_task_count || 0)));
+      if (t.credits && t.credits > 0) {
+        riderMap[key].tripCredits = Math.max(riderMap[key].tripCredits || 0, t.credits);
+      }
+    });
+
+    // B. Correlate with settlements from reconciliation ledger
+    allSettlements.forEach(item => {
+      const riderName = (item.worker_name || 'Inconnu').trim();
+      const code = (item.worker_code || '').trim();
+      const positiveAmt = Math.abs(parseFloat(item.amount) || 0);
+      const key = getCanonicalName(riderName) || (code ? code.toLowerCase() : 'unknown');
+
+      if (!riderMap[key]) {
+        riderMap[key] = {
+          name: riderName,
+          code: code || 'RECON',
+          tripRefs: [],
+          deliveredCount: 0,
+          undeliveredCount: 0,
+          totalCount: 0,
+          status: 'completed',
+          tripCredits: 0,
+          settledAmount: 0,
+          amount: 0,
+          cashier: item.employee_name,
+          parcels: [],
+          detailsLoaded: false
+        };
+      }
+
+      riderMap[key].settledAmount = (riderMap[key].settledAmount || 0) + positiveAmt;
+      if (item.employee_name && !riderMap[key].cashier) {
+        riderMap[key].cashier = item.employee_name;
+      }
+      riderMap[key].parcels.push({
+        id: item.id,
+        reference_number: item.reference_number,
+        amount: positiveAmt,
+        created_at: item.created_at,
+        employee_name: item.employee_name,
+        isDelivered: true
+      });
+    });
+
+    // C. Finalize amount and count fallbacks
+    Object.values(riderMap).forEach(r => {
+      const settled = r.settledAmount || 0;
+      const credits = r.tripCredits || 0;
+      r.amount = settled > 0 ? settled : credits;
+
+      if (r.deliveredCount === 0 && r.parcels.length > 0) {
+        r.deliveredCount = r.parcels.length;
+        r.totalCount = r.parcels.length;
+      }
+    });
+
+    return Object.values(riderMap);
+  }
+
   // ── Consignment Status Update ────────────────────────
 
   function ensureStatusUpdateUI() {
@@ -1795,27 +2632,38 @@
 
     if (document.querySelector('.chrono-status-widget')) return;
 
-    // Extract reference number from URL
-    const parts = location.pathname.split('/');
+    // Extract reference number safely from URL
+    const cleanPath = location.pathname.replace(/\/+$/, '');
+    const parts = cleanPath.split('/').filter(Boolean);
     const referenceNumber = parts[parts.length - 1];
     if (!referenceNumber) return;
+
+    const savedApiKey = localStorage.getItem('chrono_shipsy_api_key') || '';
 
     const widget = document.createElement('div');
     widget.className = 'chrono-status-widget';
     widget.innerHTML = `
-      <div class="chrono-status-header">Chrono: Update Status</div>
+      <div class="chrono-status-header">
+        <span>Chrono: Update Status</span>
+        <button class="chrono-status-key-toggle" title="Configure Shipsy API Key" type="button">🔑</button>
+      </div>
       <div class="chrono-status-body">
+        <div class="chrono-status-key-box" style="${savedApiKey ? 'display: none;' : ''}">
+          <input type="password" class="chrono-status-key-input" placeholder="Paste Shipsy API Key" value="${savedApiKey ? '••••••••' : ''}" />
+          <button class="chrono-status-key-save" type="button">Save</button>
+        </div>
         <select class="chrono-status-select">
           <option value="">-- Select Status --</option>
           <option value="reached_at_hub">Reached at Hub</option>
           <option value="delivered">Delivered</option>
           <option value="attempted">Attempted / Undelivered</option>
-          <option value="cancelled">Cancelled</option>
+          <option value="cancel">Cancelled</option>
           <option value="pickup_completed">Pickup Completed</option>
           <option value="reacheddestination">Reached Destination</option>
           <option value="rto_delivered">RTO Delivered</option>
+          <option value="rto">RTO Initiated</option>
         </select>
-        <input type="text" class="chrono-status-reason" placeholder="Reason (e.g. refused, absent)" style="display: none;" />
+        <input type="text" class="chrono-status-reason" placeholder="Reason (e.g. absent, refusé, injoignable)" style="display: none;" />
         <button class="chrono-status-btn" disabled>Update</button>
       </div>
     `;
@@ -1825,10 +2673,39 @@
     const select = widget.querySelector('.chrono-status-select');
     const reasonInput = widget.querySelector('.chrono-status-reason');
     const btn = widget.querySelector('.chrono-status-btn');
+    const keyToggle = widget.querySelector('.chrono-status-key-toggle');
+    const keyBox = widget.querySelector('.chrono-status-key-box');
+    const keyInput = widget.querySelector('.chrono-status-key-input');
+    const keySaveBtn = widget.querySelector('.chrono-status-key-save');
+
+    // Toggle API key box
+    keyToggle.addEventListener('click', () => {
+      const isHidden = keyBox.style.display === 'none';
+      keyBox.style.display = isHidden ? 'flex' : 'none';
+      if (isHidden) {
+        keyInput.value = localStorage.getItem('chrono_shipsy_api_key') || '';
+        keyInput.focus();
+      }
+    });
+
+    // Save API key
+    keySaveBtn.addEventListener('click', () => {
+      const val = keyInput.value.trim();
+      if (val && !val.includes('••••')) {
+        localStorage.setItem('chrono_shipsy_api_key', val);
+        showToast('Shipsy API Key saved ✓');
+        keyBox.style.display = 'none';
+      } else if (!val) {
+        localStorage.removeItem('chrono_shipsy_api_key');
+        showToast('Shipsy API Key removed');
+      } else {
+        keyBox.style.display = 'none';
+      }
+    });
 
     const checkValidity = () => {
-      const isAttempted = select.value === 'attempted';
-      if (isAttempted) {
+      const needsReason = select.value === 'attempted' || select.value === 'cancel';
+      if (needsReason) {
         btn.disabled = !reasonInput.value.trim();
       } else {
         btn.disabled = !select.value;
@@ -1836,7 +2713,7 @@
     };
 
     select.addEventListener('change', () => {
-      if (select.value === 'attempted') {
+      if (select.value === 'attempted' || select.value === 'cancel') {
         reasonInput.style.display = 'block';
       } else {
         reasonInput.style.display = 'none';
@@ -1851,48 +2728,63 @@
       const eventCode = select.value;
       if (!eventCode) return;
       const reason = reasonInput.value.trim();
+      const currentApiKey = localStorage.getItem('chrono_shipsy_api_key') || '';
+
+      if (!currentApiKey) {
+        keyBox.style.display = 'flex';
+        keyInput.value = '';
+        keyInput.focus();
+        showToast('⚠️ Shipsy API Key required. Please enter your API key and click Save.');
+        return;
+      }
 
       btn.disabled = true;
       btn.textContent = 'Updating...';
 
       try {
-        await updateConsignmentStatus(eventCode, referenceNumber, reason);
-        showToast(`Status successfully updated to ${eventCode}`);
-        setTimeout(() => location.reload(), 2000);
+        await updateConsignmentStatus(eventCode, referenceNumber, reason, currentApiKey);
+        showToast(`✓ Status successfully updated to ${eventCode}`);
+        setTimeout(() => location.reload(), 1800);
       } catch (err) {
         console.error('[ChronoExt] Status update failed:', err);
-        showToast('❌ Update failed. Check console.');
+        const errStr = err.message || String(err);
+        
+        if (errStr.includes('API key') || errStr.includes('NO_API_KEY') || errStr.includes('WRONG_API_KEY') || errStr.includes('401')) {
+          keyBox.style.display = 'flex';
+          keyInput.focus();
+          showToast(`❌ Authentication failed: ${errStr}. Check API Key.`);
+        } else {
+          showToast(`❌ Update failed: ${errStr}`);
+        }
+
         btn.disabled = false;
         btn.textContent = 'Update';
       }
     });
   }
 
-  async function updateConsignmentStatus(eventCode, referenceNumber) {
-    if (!apiTokens) {
-      throw new Error('API Tokens missing. Please refresh the page.');
-    }
-
-    const url = `https://projectxeuapi.shipsy.io/api/client/integration/consignment/event/${eventCode}`;
-    const payload = {
-      reference_number: referenceNumber,
-      event_time_epoch: Math.floor(Date.now() / 1000)
-    };
-
-    const headers = { ...apiTokens, 'Content-Type': 'application/json' };
-
-    const res = await fetch(url, {
-      method: 'POST',
-      headers,
-      body: JSON.stringify(payload)
+  function updateConsignmentStatus(eventCode, referenceNumber, reason, apiKey) {
+    return new Promise((resolve, reject) => {
+      chrome.runtime.sendMessage({
+        action: 'UPDATE_CONSIGNMENT_STATUS',
+        eventCode,
+        referenceNumber,
+        reason,
+        apiKey: apiKey || localStorage.getItem('chrono_shipsy_api_key') || '',
+        apiTokens
+      }, (response) => {
+        if (chrome.runtime.lastError) {
+          return reject(new Error(chrome.runtime.lastError.message || 'Failed to communicate with extension background service worker. Please reload the extension.'));
+        }
+        if (!response) {
+          return reject(new Error('No response from background service worker.'));
+        }
+        if (!response.success) {
+          return reject(new Error(response.error || `HTTP ${response.status || 'Error'}`));
+        }
+        resolve(response.data);
+      });
     });
-
-    if (!res.ok) {
-      const text = await res.text();
-      throw new Error(`API Error ${res.status}: ${text}`);
-    }
-
-    return await res.json();
   }
 
   // Start preloading the Inscan iframe immediately on any page

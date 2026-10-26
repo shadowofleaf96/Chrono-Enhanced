@@ -1,0 +1,120 @@
+<?xml version="1.0" encoding="utf-8"?>
+<androidx.coordinatorlayout.widget.CoordinatorLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    xmlns:tools="http://schemas.android.com/tools"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:background="@color/bg_screen">
+
+    <com.google.android.material.appbar.AppBarLayout
+        android:id="@+id/app_bar_layout"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        app:elevation="4dp">
+
+        <com.google.android.material.appbar.MaterialToolbar
+            android:id="@+id/toolbar_marjane"
+            android:layout_width="match_parent"
+            android:layout_height="?attr/actionBarSize"
+            android:background="@color/marjane_primary"
+            app:navigationIcon="@drawable/ic_portal_switch"
+            app:navigationIconTint="@color/marjane_on_primary"
+            app:subtitle="GoFleet Enhancer Actif"
+            app:subtitleTextColor="@color/marjane_accent_light"
+            app:title="Marjane Mall TMS"
+            app:titleTextColor="@color/marjane_on_primary" />
+
+        <com.google.android.material.progressindicator.LinearProgressIndicator
+            android:id="@+id/progress_loading"
+            android:layout_width="match_parent"
+            android:layout_height="4dp"
+            android:indeterminate="true"
+            android:visibility="gone"
+            app:indicatorColor="@color/marjane_accent"
+            app:trackColor="@color/marjane_primary_dark" />
+
+    </com.google.android.material.appbar.AppBarLayout>
+
+    <FrameLayout
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        app:layout_behavior="@string/appbar_scrolling_view_behavior">
+
+        <!-- Modern WebView -->
+        <WebView
+            android:id="@+id/webview_marjane"
+            android:layout_width="match_parent"
+            android:layout_height="match_parent"
+            android:scrollbars="vertical" />
+
+        <!-- Error / Retry Container -->
+        <LinearLayout
+            android:id="@+id/layout_error"
+            android:layout_width="match_parent"
+            android:layout_height="match_parent"
+            android:background="@color/bg_screen"
+            android:gravity="center"
+            android:orientation="vertical"
+            android:padding="24dp"
+            android:visibility="gone">
+
+            <ImageView
+                android:layout_width="64dp"
+                android:layout_height="64dp"
+                android:contentDescription="Erreur"
+                android:src="@drawable/ic_error_outline"
+                app:tint="@color/status_undelivered" />
+
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="16dp"
+                android:fontFamily="sans-serif-bold"
+                android:text="Impossible de charger le TMS Marjane"
+                android:textColor="@color/text_primary"
+                android:textSize="18sp" />
+
+            <TextView
+                android:id="@+id/tv_error_details"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="8dp"
+                android:gravity="center"
+                android:text="Vérifiez votre connexion Internet ou l'accès au réseau Marjane Mall."
+                android:textColor="@color/text_secondary"
+                android:textSize="13sp" />
+
+            <com.google.android.material.button.MaterialButton
+                android:id="@+id/btn_retry"
+                android:layout_width="wrap_content"
+                android:layout_height="48dp"
+                android:layout_marginTop="20dp"
+                android:backgroundTint="@color/marjane_primary"
+                android:fontFamily="sans-serif-bold"
+                android:text="Réessayer"
+                android:textColor="@color/marjane_on_primary"
+                app:cornerRadius="10dp"
+                app:icon="@drawable/ic_refresh"
+                app:iconTint="@color/marjane_on_primary" />
+        </LinearLayout>
+
+    </FrameLayout>
+
+    <!-- Barcode Scanner FAB (Hidden to prevent overlapping website buttons; replaced inline on webpage) -->
+    <com.google.android.material.floatingactionbutton.ExtendedFloatingActionButton
+        android:id="@+id/fab_scan_barcode"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_gravity="bottom|end"
+        android:layout_margin="16dp"
+        android:backgroundTint="@color/marjane_accent"
+        android:fontFamily="sans-serif-bold"
+        android:text="Scanner"
+        android:textColor="#FFFFFF"
+        android:visibility="gone"
+        app:elevation="6dp"
+        app:icon="@drawable/ic_scan_barcode"
+        app:iconTint="#FFFFFF"
+        app:rippleColor="#40FFFFFF" />
+
+</androidx.coordinatorlayout.widget.CoordinatorLayout>

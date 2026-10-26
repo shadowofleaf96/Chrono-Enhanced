@@ -1,0 +1,21 @@
+<resources>
+    <!-- Base application theme -->
+    <style name="Theme.ChronoMohammedia" parent="Theme.Material3.Light.NoActionBar">
+        <!-- Primary brand color -->
+        <item name="colorPrimary">@color/chrono_primary</item>
+        <item name="colorOnPrimary">@color/chrono_on_primary</item>
+        <item name="colorPrimaryContainer">@color/chrono_primary_light</item>
+
+        <!-- Secondary brand color -->
+        <item name="colorSecondary">@color/chrono_secondary</item>
+        <item name="colorOnSecondary">@color/chrono_on_secondary</item>
+
+        <!-- Status bar & Navigation bar color -->
+        <item name="android:statusBarColor">@color/chrono_primary_dark</item>
+        <item name="android:windowLightStatusBar">false</item>
+        <item name="android:navigationBarColor">@color/bg_screen</item>
+        <item name="android:windowLightNavigationBar">true</item>
+
+        <item name="android:windowBackground">@color/bg_screen</item>
+    </style>
+</resources>

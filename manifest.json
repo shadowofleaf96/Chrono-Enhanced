@@ -3,7 +3,10 @@
   "name": "Chrono Enhanced",
   "version": "1.0.0",
   "description": "Enhanced features and tools for Chronodiali operations",
-  "permissions": ["activeTab"],
+  "permissions": ["activeTab", "storage"],
+  "background": {
+    "service_worker": "background.js"
+  },
   "host_permissions": [
     "https://cross.chronodiali.ma/*",
     "https://projectxeuapi.shipsy.io/*"

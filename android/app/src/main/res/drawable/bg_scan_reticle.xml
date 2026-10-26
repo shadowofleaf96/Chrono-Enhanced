@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="utf-8"?>
+<layer-list xmlns:android="http://schemas.android.com/apk/res/android">
+    <!-- Outer Viewfinder Frame -->
+    <item>
+        <shape android:shape="rectangle">
+            <stroke android:width="2dp" android:color="#80FFFFFF" />
+            <corners android:radius="12dp" />
+            <solid android:color="#00000000" />
+        </shape>
+    </item>
+    <!-- Laser line -->
+    <item android:gravity="center" android:height="2dp" android:start="16dp" android:end="16dp">
+        <shape android:shape="rectangle">
+            <solid android:color="#0088CE" />
+            <corners android:radius="1dp" />
+        </shape>
+    </item>
+</layer-list>

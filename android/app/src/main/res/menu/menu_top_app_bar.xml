@@ -1,0 +1,29 @@
+<?xml version="1.0" encoding="utf-8"?>
+<menu xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto">
+    <item
+        android:id="@+id/action_scan_parcels"
+        android:icon="@drawable/ic_scan_barcode"
+        android:title="Scanner les Colis"
+        app:showAsAction="always" />
+    <item
+        android:id="@+id/action_search_consignment"
+        android:icon="@drawable/ic_search"
+        android:title="Rechercher un colis"
+        app:showAsAction="ifRoom" />
+    <item
+        android:id="@+id/action_refresh"
+        android:icon="@drawable/ic_refresh"
+        android:title="Actualiser"
+        app:showAsAction="ifRoom" />
+    <item
+        android:id="@+id/action_settings"
+        android:icon="@drawable/ic_settings"
+        android:title="@string/menu_settings"
+        app:showAsAction="ifRoom" />
+    <item
+        android:id="@+id/action_switch_marjane"
+        android:icon="@drawable/ic_marjane_store"
+        android:title="🛒 Marjane Mall TMS"
+        app:showAsAction="never" />
+</menu>

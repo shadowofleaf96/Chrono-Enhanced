@@ -1,0 +1,27 @@
+# Android build & local files
+android/.gradle/
+android/.idea/
+android/.kotlin/
+android/app/build/
+android/build/
+android/local.properties
+android/*.png
+android/window_dump.xml
+*.iml
+
+# Node / temporary debug & reverse-engineering scripts
+find_*.js
+inspect_*.js
+test_recon_live.js
+chunks.json
+consignments_get_res.json
+fetchOne_result.json
+sample_complete_cn.json
+sample_consignment_fetchOne.json
+
+# Temporary root test screenshots (preserve icons/)
+/*.png
+
+# OS metadata
+.DS_Store
+Thumbs.db

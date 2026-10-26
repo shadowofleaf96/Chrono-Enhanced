@@ -1,0 +1,60 @@
+<?xml version="1.0" encoding="utf-8"?>
+<menu xmlns:android="http://schemas.android.com/apk/res/android">
+    <group android:id="@+id/group_operations" android:checkableBehavior="single">
+        <item
+            android:id="@+id/nav_all_riders"
+            android:icon="@drawable/ic_rider"
+            android:title="@string/menu_all_riders"
+            android:checked="true" />
+        <item
+            android:id="@+id/nav_finished_trips"
+            android:icon="@drawable/ic_done_all"
+            android:title="@string/menu_finished_trips" />
+        <item
+            android:id="@+id/nav_settlements"
+            android:icon="@drawable/ic_payments"
+            android:title="@string/menu_settlements" />
+        <item
+            android:id="@+id/nav_undelivered"
+            android:icon="@drawable/ic_package"
+            android:title="@string/menu_undelivered" />
+        <item
+            android:id="@+id/nav_lookup_consignment"
+            android:icon="@drawable/ic_search"
+            android:title="Recherche Colis (Suivi)" />
+        <item
+            android:id="@+id/nav_hub_scan"
+            android:icon="@drawable/ic_scan_barcode"
+            android:title="Scanner Colis (Inscan / Outscan / Arrival)" />
+    </group>
+
+    <item android:title="Espaces &amp; Plateformes Hub">
+        <menu>
+            <item
+                android:id="@+id/nav_marjane_mall"
+                android:icon="@drawable/ic_marjane_store"
+                android:title="🛒 Marjane Mall TMS (GoFleet)" />
+            <item
+                android:id="@+id/nav_portal_selector"
+                android:icon="@drawable/ic_portal_switch"
+                android:title="🔄 Changer d'espace (Portail)" />
+        </menu>
+    </item>
+
+    <item android:title="@string/menu_group_system">
+        <menu>
+            <item
+                android:id="@+id/nav_settings"
+                android:icon="@drawable/ic_settings"
+                android:title="@string/menu_settings" />
+            <item
+                android:id="@+id/nav_sync"
+                android:icon="@drawable/ic_refresh"
+                android:title="Actualiser Données Hub" />
+            <item
+                android:id="@+id/nav_logout"
+                android:icon="@drawable/ic_logout"
+                android:title="Changer de compte / Déconnexion" />
+        </menu>
+    </item>
+</menu>

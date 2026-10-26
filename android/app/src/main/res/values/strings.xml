@@ -1,0 +1,54 @@
+<resources>
+    <string name="app_name">Chrono &amp; Marjane Hub</string>
+    <string name="hub_title">Hub Mohammedia</string>
+    <string name="hub_subtitle">Opérations Livreurs &amp; Règlements</string>
+    <string name="portal_title">Portail Logistique Hub</string>
+    <string name="portal_subtitle">Mohammedia • Choisissez votre plateforme de travail</string>
+    <string name="marjane_title">Marjane Mall</string>
+    <string name="marjane_subtitle">TMS GoFleet Mohammedia</string>
+
+    <!-- Navigation Menu Items -->
+    <string name="menu_all_riders">Livreurs (Tous)</string>
+    <string name="menu_finished_trips">Courses Terminées (✔)</string>
+    <string name="menu_settlements">Montants à Régler</string>
+    <string name="menu_undelivered">Colis Non Livrés</string>
+    <string name="menu_settings">Mon Compte &amp; Session</string>
+    <string name="menu_group_operations">Opérations</string>
+    <string name="menu_group_finance">Finance &amp; Audit</string>
+    <string name="menu_group_system">Système</string>
+
+    <!-- UI Labels -->
+    <string name="search_hint">Rechercher livreur ou code…</string>
+    <string name="filter_all">Tous</string>
+    <string name="filter_finished">Terminés (✔)</string>
+    <string name="filter_in_transit">En Course</string>
+    <string name="filter_has_due">Avec Solde</string>
+
+    <string name="kpi_total_due">Total à Régler</string>
+    <string name="kpi_finished_trips">Courses Finies</string>
+    <string name="kpi_delivered_rate">Taux Livraison</string>
+    <string name="kpi_total_parcels">Total Colis</string>
+
+    <string name="status_trip_finished">✔ Course Terminée</string>
+    <string name="status_in_transit">🚚 En Course</string>
+    <string name="status_not_started">⏸ Non Démarré</string>
+
+    <string name="label_delivered">Livrés</string>
+    <string name="label_undelivered">Non Livrés</string>
+    <string name="label_due_amount">Montant à régler</string>
+    <string name="currency_mad">MAD</string>
+
+    <!-- Detail Bottom Sheet -->
+    <string name="detail_title">Fiche Livreur</string>
+    <string name="detail_tab_delivered">Colis Livrés (%1$d)</string>
+    <string name="detail_tab_undelivered">Colis Non Livrés (%1$d)</string>
+    <string name="detail_settlement_breakdown">Détail du Règlement</string>
+    <string name="btn_call_rider">Appeler le Livreur</string>
+    <string name="btn_close">Fermer</string>
+    <string name="reconciled_by">Réconcilié par : %1$s</string>
+
+    <!-- Empty State & Errors -->
+    <string name="empty_riders_title">Aucun livreur trouvé</string>
+    <string name="empty_riders_subtitle">Essayez de modifier vos filtres ou effectuez un rafraîchissement.</string>
+    <string name="sync_success">Données synchronisées avec succès</string>
+</resources>
