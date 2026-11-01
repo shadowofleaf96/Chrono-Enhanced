@@ -3,6 +3,13 @@
     xmlns:app="http://schemas.android.com/apk/res-auto">
 
     <item
+        android:id="@+id/action_search_marjane"
+        android:icon="@drawable/ic_search"
+        android:title="Rechercher dans la page"
+        app:iconTint="@color/chrono_on_primary"
+        app:showAsAction="always" />
+
+    <item
         android:id="@+id/action_scan_marjane"
         android:icon="@drawable/ic_scan_barcode"
         android:title="Scanner Colis"

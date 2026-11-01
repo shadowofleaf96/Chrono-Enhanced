@@ -24,6 +24,81 @@
             app:title="Marjane Mall TMS"
             app:titleTextColor="@color/marjane_on_primary" />
 
+        <!-- In-Page Search Bar -->
+        <LinearLayout
+            android:id="@+id/layout_search_bar"
+            android:layout_width="match_parent"
+            android:layout_height="52dp"
+            android:background="#FFFFFF"
+            android:elevation="4dp"
+            android:gravity="center_vertical"
+            android:orientation="horizontal"
+            android:paddingStart="12dp"
+            android:paddingEnd="8dp"
+            android:visibility="gone">
+
+            <ImageView
+                android:layout_width="20dp"
+                android:layout_height="20dp"
+                android:contentDescription="Rechercher"
+                android:src="@drawable/ic_search"
+                app:tint="@color/marjane_primary" />
+
+            <EditText
+                android:id="@+id/edit_search_query"
+                android:layout_width="0dp"
+                android:layout_height="match_parent"
+                android:layout_marginStart="8dp"
+                android:layout_marginEnd="4dp"
+                android:layout_weight="1"
+                android:background="@null"
+                android:hint="Rechercher dans la page..."
+                android:imeOptions="actionSearch"
+                android:inputType="textNoSuggestions|text"
+                android:maxLines="1"
+                android:textColor="@color/text_primary"
+                android:textColorHint="@color/text_secondary"
+                android:textSize="14sp" />
+
+            <TextView
+                android:id="@+id/text_search_count"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginEnd="4dp"
+                android:fontFamily="sans-serif-medium"
+                android:textColor="@color/text_secondary"
+                android:textSize="12sp"
+                tools:text="1/5" />
+
+            <ImageButton
+                android:id="@+id/btn_search_prev"
+                android:layout_width="36dp"
+                android:layout_height="36dp"
+                android:background="?attr/selectableItemBackgroundBorderless"
+                android:contentDescription="Précédent"
+                android:src="@drawable/ic_arrow_up"
+                app:tint="@color/marjane_primary" />
+
+            <ImageButton
+                android:id="@+id/btn_search_next"
+                android:layout_width="36dp"
+                android:layout_height="36dp"
+                android:background="?attr/selectableItemBackgroundBorderless"
+                android:contentDescription="Suivant"
+                android:src="@drawable/ic_arrow_down"
+                app:tint="@color/marjane_primary" />
+
+            <ImageButton
+                android:id="@+id/btn_close_search"
+                android:layout_width="36dp"
+                android:layout_height="36dp"
+                android:background="?attr/selectableItemBackgroundBorderless"
+                android:contentDescription="Fermer la recherche"
+                android:src="@drawable/ic_close"
+                app:tint="@color/text_secondary" />
+
+        </LinearLayout>
+
         <com.google.android.material.progressindicator.LinearProgressIndicator
             android:id="@+id/progress_loading"
             android:layout_width="match_parent"

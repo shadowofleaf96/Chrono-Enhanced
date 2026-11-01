@@ -9,9 +9,13 @@ import android.graphics.Bitmap
 import android.net.Uri
 import android.os.Bundle
 import android.os.Environment
+import android.text.Editable
+import android.text.TextWatcher
 import android.util.Base64
 import android.util.Log
 import android.view.View
+import android.view.inputmethod.EditorInfo
+import android.view.inputmethod.InputMethodManager
 import android.webkit.*
 import android.widget.Toast
 import androidx.activity.result.contract.ActivityResultContracts
@@ -89,6 +93,10 @@ class MarjaneMallActivity : AppCompatActivity() {
         binding.toolbarMarjane.inflateMenu(R.menu.menu_marjane_top_app_bar)
         binding.toolbarMarjane.setOnMenuItemClickListener { item ->
             when (item.itemId) {
+                R.id.action_search_marjane -> {
+                    toggleInPageSearch()
+                    true
+                }
                 R.id.action_scan_marjane -> {
                     launchBarcodeScanner()
                     true
@@ -112,6 +120,34 @@ class MarjaneMallActivity : AppCompatActivity() {
             binding.layoutError.visibility = View.GONE
             binding.webviewMarjane.visibility = View.VISIBLE
             binding.webviewMarjane.reload()
+        }
+
+        // In-page search bar listeners
+        binding.editSearchQuery.addTextChangedListener(object : TextWatcher {
+            override fun beforeTextChanged(s: CharSequence?, start: Int, count: Int, after: Int) {}
+            override fun onTextChanged(s: CharSequence?, start: Int, before: Int, count: Int) {
+                performFindInPage(s?.toString()?.trim().orEmpty())
+            }
+            override fun afterTextChanged(s: Editable?) {}
+        })
+
+        binding.editSearchQuery.setOnEditorActionListener { _, actionId, _ ->
+            if (actionId == EditorInfo.IME_ACTION_SEARCH || actionId == EditorInfo.IME_ACTION_DONE) {
+                binding.webviewMarjane.findNext(true)
+                true
+            } else false
+        }
+
+        binding.btnSearchPrev.setOnClickListener {
+            binding.webviewMarjane.findNext(false)
+        }
+
+        binding.btnSearchNext.setOnClickListener {
+            binding.webviewMarjane.findNext(true)
+        }
+
+        binding.btnCloseSearch.setOnClickListener {
+            closeInPageSearch()
         }
     }
 
@@ -141,6 +177,15 @@ class MarjaneMallActivity : AppCompatActivity() {
         }
 
         webView.addJavascriptInterface(MarjaneJsBridge(), "AndroidApp")
+
+        webView.setFindListener { activeMatchOrdinal, numberOfMatches, isDoneCounting ->
+            if (numberOfMatches > 0) {
+                binding.textSearchCount.text = "${activeMatchOrdinal + 1}/$numberOfMatches"
+            } else {
+                val query = binding.editSearchQuery.text?.toString()?.trim().orEmpty()
+                binding.textSearchCount.text = if (query.isNotEmpty() && isDoneCounting) "0/0" else ""
+            }
+        }
 
         webView.webChromeClient = object : WebChromeClient() {
             override fun onProgressChanged(view: WebView?, newProgress: Int) {
@@ -493,6 +538,14 @@ class MarjaneMallActivity : AppCompatActivity() {
     }
 
     private fun injectScannedBarcode(code: String) {
+        if (binding.layoutSearchBar.visibility == View.VISIBLE) {
+            binding.editSearchQuery.setText(code)
+            binding.editSearchQuery.setSelection(code.length)
+            performFindInPage(code)
+            Toast.makeText(this, "🔍 Recherche du code scanné : $code", Toast.LENGTH_SHORT).show()
+            return
+        }
+
         val escaped = code.replace("'", "\\'").replace("\"", "\\\"").trim()
         val script = """
             (function() {
@@ -606,8 +659,48 @@ class MarjaneMallActivity : AppCompatActivity() {
         startActivity(intent)
     }
 
+    private fun toggleInPageSearch() {
+        if (binding.layoutSearchBar.visibility == View.VISIBLE) {
+            closeInPageSearch()
+        } else {
+            openInPageSearch()
+        }
+    }
+
+    private fun openInPageSearch() {
+        binding.layoutSearchBar.visibility = View.VISIBLE
+        binding.editSearchQuery.requestFocus()
+        val imm = getSystemService(Context.INPUT_METHOD_SERVICE) as? InputMethodManager
+        imm?.showSoftInput(binding.editSearchQuery, InputMethodManager.SHOW_IMPLICIT)
+        val query = binding.editSearchQuery.text?.toString()?.trim().orEmpty()
+        if (query.isNotEmpty()) {
+            performFindInPage(query)
+        }
+    }
+
+    private fun closeInPageSearch() {
+        binding.layoutSearchBar.visibility = View.GONE
+        val imm = getSystemService(Context.INPUT_METHOD_SERVICE) as? InputMethodManager
+        imm?.hideSoftInputFromWindow(binding.editSearchQuery.windowToken, 0)
+        binding.webviewMarjane.clearMatches()
+        binding.textSearchCount.text = ""
+    }
+
+    private fun performFindInPage(query: String) {
+        if (query.isBlank()) {
+            binding.webviewMarjane.clearMatches()
+            binding.textSearchCount.text = ""
+        } else {
+            binding.webviewMarjane.findAllAsync(query)
+        }
+    }
+
     @Deprecated("Deprecated in Java")
     override fun onBackPressed() {
+        if (binding.layoutSearchBar.visibility == View.VISIBLE) {
+            closeInPageSearch()
+            return
+        }
         if (binding.webviewMarjane.canGoBack()) {
             binding.webviewMarjane.goBack()
         } else {
