@@ -700,6 +700,142 @@
 
             </HorizontalScrollView>
 
+            <!-- Not Delivered Tab Action Card: Inscan au Hub Button directly in the tab -->
+            <com.google.android.material.card.MaterialCardView
+                android:id="@+id/card_not_delivered_action"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginStart="12dp"
+                android:layout_marginTop="10dp"
+                android:layout_marginEnd="12dp"
+                app:cardBackgroundColor="#EFF6FF"
+                app:cardCornerRadius="12dp"
+                app:cardElevation="0dp"
+                app:strokeColor="#BFDBFE"
+                app:strokeWidth="1dp"
+                android:visibility="visible">
+
+                <LinearLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:gravity="center_vertical"
+                    android:orientation="horizontal"
+                    android:padding="12dp">
+
+                    <LinearLayout
+                        android:layout_width="0dp"
+                        android:layout_height="wrap_content"
+                        android:layout_weight="1"
+                        android:orientation="vertical">
+
+                        <TextView
+                            android:id="@+id/text_not_delivered_title"
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:text="Colis non livrés (retours)"
+                            android:textColor="#1E40AF"
+                            android:textSize="13sp"
+                            android:textStyle="bold" />
+
+                        <TextView
+                            android:id="@+id/text_not_delivered_subtitle"
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:layout_marginTop="2dp"
+                            android:text="Inscannez les retours au Hub avant de régler le livreur"
+                            android:textColor="#3B82F6"
+                            android:textSize="11sp" />
+                    </LinearLayout>
+
+                    <!-- Inscan Button directly in the not-delivered tab -->
+                    <com.google.android.material.button.MaterialButton
+                        android:id="@+id/btn_inscan_tab"
+                        style="@style/Widget.Material3.Button"
+                        android:layout_width="wrap_content"
+                        android:layout_height="40dp"
+                        android:layout_marginStart="8dp"
+                        android:backgroundTint="#2563EB"
+                        android:text="📥 Inscan au Hub"
+                        android:textColor="#FFFFFF"
+                        android:textSize="12sp"
+                        android:textStyle="bold"
+                        app:cornerRadius="10dp"
+                        app:icon="@drawable/ic_in_transit"
+                        app:iconSize="16dp"
+                        app:iconTint="#FFFFFF" />
+
+                </LinearLayout>
+
+            </com.google.android.material.card.MaterialCardView>
+
+            <!-- Delivered Tab Action Card: Check all delivered parcels with price option -->
+            <com.google.android.material.card.MaterialCardView
+                android:id="@+id/card_delivered_action"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginStart="12dp"
+                android:layout_marginTop="10dp"
+                android:layout_marginEnd="12dp"
+                app:cardBackgroundColor="#F0FDF4"
+                app:cardCornerRadius="12dp"
+                app:cardElevation="0dp"
+                app:strokeColor="#BBF7D0"
+                app:strokeWidth="1dp"
+                android:visibility="gone">
+
+                <LinearLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:gravity="center_vertical"
+                    android:orientation="horizontal"
+                    android:padding="12dp">
+
+                    <LinearLayout
+                        android:layout_width="0dp"
+                        android:layout_height="wrap_content"
+                        android:layout_weight="1"
+                        android:orientation="vertical">
+
+                        <TextView
+                            android:id="@+id/text_delivered_checked_count"
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:text="Colis avec prix : 0 cochés"
+                            android:textColor="#166534"
+                            android:textSize="13sp"
+                            android:textStyle="bold" />
+
+                        <TextView
+                            android:id="@+id/text_delivered_checked_amount"
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:layout_marginTop="2dp"
+                            android:text="Total à encaisser : 0,00 MAD"
+                            android:textColor="#15803D"
+                            android:textSize="11sp" />
+                    </LinearLayout>
+
+                    <!-- Check All with Price Button -->
+                    <com.google.android.material.button.MaterialButton
+                        android:id="@+id/btn_check_all_with_price"
+                        style="@style/Widget.Material3.Button"
+                        android:layout_width="wrap_content"
+                        android:layout_height="40dp"
+                        android:layout_marginStart="8dp"
+                        android:backgroundTint="#059669"
+                        android:text="☑ Tout cocher avec prix"
+                        android:textColor="#FFFFFF"
+                        android:textSize="11sp"
+                        android:textStyle="bold"
+                        app:cornerRadius="10dp"
+                        app:icon="@drawable/ic_check_circle"
+                        app:iconSize="16dp"
+                        app:iconTint="#FFFFFF" />
+
+                </LinearLayout>
+
+            </com.google.android.material.card.MaterialCardView>
+
             <!-- All Scanned Celebration Card (Shown when all done) -->
             <com.google.android.material.card.MaterialCardView
                 android:id="@+id/card_celebration"

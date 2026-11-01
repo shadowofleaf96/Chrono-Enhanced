@@ -51,6 +51,7 @@ class RiderReconciliationActivity : AppCompatActivity() {
     private val parcelsToScan = mutableListOf<ParcelDetail>()
     private val deliveredParcels = mutableListOf<ParcelDetail>()
     private val scannedRefs = mutableSetOf<String>()
+    private val checkedDeliveredRefs = mutableSetOf<String>()
 
     private var isInscanCompleted: Boolean = false
     private var currentFilterTab = TAB_UNSCANNED
@@ -64,9 +65,22 @@ class RiderReconciliationActivity : AppCompatActivity() {
             if (!list.isNullOrEmpty()) {
                 var newlyScanned = 0
                 for (rawCode in list) {
-                    val match = findMatchingReturnParcel(rawCode)
-                    if (match != null && scannedRefs.add(match.referenceNumber)) {
-                        newlyScanned++
+                    val returnMatch = findMatchingReturnParcel(rawCode)
+                    if (returnMatch != null) {
+                        if (scannedRefs.add(returnMatch.referenceNumber)) {
+                            newlyScanned++
+                        }
+                    } else {
+                        // Check if it belongs to delivered parcels to automatically validate it
+                        val clean = CameraXScannerHelper.cleanBarcodeValue(rawCode)
+                        val cleanNorm = clean.replace("-", "").replace(" ", "").replace("*", "").uppercase()
+                        val delMatch = deliveredParcels.find { p ->
+                            val refNorm = p.referenceNumber.replace("-", "").replace(" ", "").replace("*", "").uppercase()
+                            refNorm == cleanNorm || p.referenceNumber.equals(clean, ignoreCase = true)
+                        }
+                        if (delMatch != null && checkedDeliveredRefs.add(delMatch.referenceNumber)) {
+                            newlyScanned++
+                        }
                     }
                 }
                 if (newlyScanned > 0) {
@@ -170,11 +184,19 @@ class RiderReconciliationActivity : AppCompatActivity() {
                 if (shouldBeScanned) {
                     if (scannedRefs.add(parcel.referenceNumber)) {
                         playSuccessFeedback()
-                        Toast.makeText(this, "✔ Colis ${parcel.referenceNumber} validé", Toast.LENGTH_SHORT).show()
+                        Toast.makeText(this, "✔ Colis ${parcel.referenceNumber} validé pour l'inscan", Toast.LENGTH_SHORT).show()
                     }
                 } else {
                     scannedRefs.remove(parcel.referenceNumber)
                     Toast.makeText(this, "Scan annulé pour ${parcel.referenceNumber}", Toast.LENGTH_SHORT).show()
+                }
+                updateUi()
+            },
+            onToggleDeliveredCheck = { parcel, isChecked ->
+                if (isChecked) {
+                    checkedDeliveredRefs.add(parcel.referenceNumber)
+                } else {
+                    checkedDeliveredRefs.remove(parcel.referenceNumber)
                 }
                 updateUi()
             },
@@ -203,6 +225,11 @@ class RiderReconciliationActivity : AppCompatActivity() {
             val intent = Intent(this, ScannerActivity::class.java).apply {
                 putExtra(ScannerActivity.EXTRA_IS_BATCH_MODE, true)
                 putStringArrayListExtra(ScannerActivity.EXTRA_ALREADY_SCANNED_CODES, ArrayList(scannedRefs))
+                // Pass all rider parcel references as expected codes so the scanner achieves 100% precision
+                val expected = allParcels.map { it.referenceNumber }.filter { it.isNotBlank() }
+                if (expected.isNotEmpty()) {
+                    putStringArrayListExtra(ScannerActivity.EXTRA_EXPECTED_CODES, ArrayList(expected))
+                }
             }
             batchScannerLauncher.launch(intent)
         }
@@ -323,7 +350,59 @@ class RiderReconciliationActivity : AppCompatActivity() {
 
     // Step 1: Inscan at Hub -> Step 2: Settle Rider
     private fun setupActions() {
-        // Step 1 Button: Inscan at Hub
+        // Inscan Button directly in the Not Delivered Parcels tab
+        binding.btnInscanTab.setOnClickListener {
+            val totalToScan = parcelsToScan.size
+            val countScanned = scannedRefs.size
+
+            if (countScanned == 0 && totalToScan > 0) {
+                MaterialAlertDialogBuilder(this)
+                    .setTitle("Inscan au Hub")
+                    .setMessage(
+                        "Vous avez $totalToScan colis retourné(s) non livré(s).\n\n" +
+                        "Voulez-vous les inscanner tous au Hub maintenant avant de régler ?"
+                    )
+                    .setPositiveButton("📥 Tout Inscanner ($totalToScan colis)") { _, _ ->
+                        scannedRefs.addAll(parcelsToScan.map { it.referenceNumber })
+                        updateUi()
+                        performInscanAtHub()
+                    }
+                    .setNeutralButton("📷 Scanner Caméra") { _, _ ->
+                        binding.btnOpenCameraScan.performClick()
+                    }
+                    .setNegativeButton("Annuler", null)
+                    .show()
+                return@setOnClickListener
+            }
+
+            performInscanAtHub()
+        }
+
+        // Option to check all delivered parcels with price
+        binding.btnCheckAllWithPrice.setOnClickListener {
+            val parcelsWithPrice = deliveredParcels.filter { it.amount > 0.0 }
+            if (parcelsWithPrice.isEmpty()) {
+                Toast.makeText(this, "Aucun colis livré avec prix pour cette tournée", Toast.LENGTH_SHORT).show()
+                return@setOnClickListener
+            }
+
+            val allWithPriceChecked = parcelsWithPrice.all { it.referenceNumber in checkedDeliveredRefs }
+            if (allWithPriceChecked) {
+                // Toggle off
+                parcelsWithPrice.forEach { checkedDeliveredRefs.remove(it.referenceNumber) }
+                Toast.makeText(this, "Colis avec prix décochés", Toast.LENGTH_SHORT).show()
+            } else {
+                // Check all with price
+                parcelsWithPrice.forEach { checkedDeliveredRefs.add(it.referenceNumber) }
+                playSuccessFeedback()
+                val totalCod = parcelsWithPrice.sumOf { it.amount }
+                val amtFmt = String.format(Locale.FRENCH, "%,.2f MAD", totalCod)
+                Toast.makeText(this, "✔ Tous les colis avec prix cochés (${parcelsWithPrice.size} colis • $amtFmt) !", Toast.LENGTH_SHORT).show()
+            }
+            updateUi()
+        }
+
+        // Step 1 Button: Inscan at Hub (Bottom bar)
         binding.btnInscanHub.setOnClickListener {
             val totalToScan = parcelsToScan.size
             val countScanned = scannedRefs.size
@@ -356,15 +435,39 @@ class RiderReconciliationActivity : AppCompatActivity() {
             val rider = currentRider ?: return@setOnClickListener
             val workerCode = getEffectiveWorkerCode()
             val totalDelivered = deliveredParcels.size
+            val totalToScan = parcelsToScan.size
+
+            // Enforce Inscan before Settle if there are undelivered parcels
+            if (!isInscanCompleted && totalToScan > 0) {
+                MaterialAlertDialogBuilder(this)
+                    .setTitle("Inscan au Hub Requis")
+                    .setMessage(
+                        "Attention : Vous devez effectuer l'Inscan au Hub des $totalToScan colis non livrés (retours) avant de régler le livreur.\n\n" +
+                        "Souhaitez-vous valider l'inscan au Hub maintenant ?"
+                    )
+                    .setPositiveButton("📥 Valider Inscan au Hub ($totalToScan)") { _, _ ->
+                        scannedRefs.addAll(parcelsToScan.map { it.referenceNumber })
+                        updateUi()
+                        performInscanAtHub()
+                    }
+                    .setNegativeButton("Annuler", null)
+                    .show()
+                return@setOnClickListener
+            }
+
+            val totalDeliveredWithPrice = deliveredParcels.count { it.amount > 0.0 }
+            val checkedWithPriceCount = deliveredParcels.count { it.amount > 0.0 && it.referenceNumber in checkedDeliveredRefs }
+            val totalCheckedAmount = deliveredParcels.filter { it.referenceNumber in checkedDeliveredRefs }.sumOf { it.amount }
             val amountStr = String.format(Locale.FRENCH, "%,.2f MAD", rider.amountToPay)
+            val checkedAmountStr = String.format(Locale.FRENCH, "%,.2f MAD", totalCheckedAmount)
 
             MaterialAlertDialogBuilder(this)
                 .setTitle("Étape 2 : Régler le Livreur (Settlement)")
                 .setMessage(
                     "Livreur : ${rider.name} ($workerCode)\n" +
-                    "Montant COD total à encaisser : $amountStr\n\n" +
-                    "✔ $totalDelivered colis livrés cochés et validés.\n" +
-                    "✔ Inscan au hub des retours validé.\n\n" +
+                    "Montant COD total théorique : $amountStr\n\n" +
+                    "✔ $checkedWithPriceCount / $totalDeliveredWithPrice colis livrés avec prix cochés ($checkedAmountStr).\n" +
+                    (if (totalToScan > 0) "✔ $totalToScan colis retournés inscannés au Hub.\n\n" else "✔ Aucun retour (100% livrés).\n\n") +
                     "Valider le règlement maintenant ?"
                 )
                 .setPositiveButton("✔ Confirmer le Règlement") { _, _ ->
@@ -482,6 +585,10 @@ class RiderReconciliationActivity : AppCompatActivity() {
             // Split into delivered and undelivered/returns
             syncSplitLists()
 
+            // Auto-check all delivered parcels that have a price (amount > 0)
+            checkedDeliveredRefs.clear()
+            checkedDeliveredRefs.addAll(deliveredParcels.filter { it.amount > 0.0 }.map { it.referenceNumber })
+
             // If rider has 0 returns (100% delivered), Inscan step is automatically completed!
             if (parcelsToScan.isEmpty()) {
                 isInscanCompleted = true
@@ -584,6 +691,46 @@ class RiderReconciliationActivity : AppCompatActivity() {
         binding.tabScanned.text = "✔ Scannés ($scannedCount)"
         binding.tabDelivered.text = "🚚 Livrés ($totalDelivered)"
         binding.tabAll.text = "Tous ($totalAll)"
+
+        // Update Inscan & Delivered Action Cards in the tabs
+        val totalDeliveredWithPrice = deliveredParcels.count { it.amount > 0.0 }
+        val checkedWithPriceCount = deliveredParcels.count { it.amount > 0.0 && it.referenceNumber in checkedDeliveredRefs }
+        val totalCheckedAmount = deliveredParcels.filter { it.referenceNumber in checkedDeliveredRefs }.sumOf { it.amount }
+
+        when (currentFilterTab) {
+            TAB_DELIVERED -> {
+                binding.cardDeliveredAction.visibility = View.VISIBLE
+                binding.cardNotDeliveredAction.visibility = View.GONE
+
+                binding.textDeliveredCheckedCount.text = "Colis avec prix : $checkedWithPriceCount / $totalDeliveredWithPrice cochés"
+                binding.textDeliveredCheckedAmount.text = "Total COD coché : ${String.format(Locale.FRENCH, "%,.2f MAD", totalCheckedAmount)}"
+
+                val allChecked = totalDeliveredWithPrice > 0 && checkedWithPriceCount == totalDeliveredWithPrice
+                binding.btnCheckAllWithPrice.text = if (allChecked) "✔ Tout avec prix coché" else "☑ Tout cocher avec prix"
+            }
+            TAB_UNSCANNED, TAB_SCANNED -> {
+                binding.cardDeliveredAction.visibility = View.GONE
+                binding.cardNotDeliveredAction.visibility = if (totalToScan > 0) View.VISIBLE else View.GONE
+
+                if (isInscanCompleted) {
+                    binding.textNotDeliveredTitle.text = "Retours : $totalToScan colis inscannés au Hub"
+                    binding.textNotDeliveredSubtitle.text = "Inscan au Hub validé avec succès."
+                    binding.btnInscanTab.text = "✔ Retours inscannés"
+                    binding.btnInscanTab.isEnabled = false
+                    binding.btnInscanTab.backgroundTintList = ContextCompat.getColorStateList(this, R.color.settlement_green)
+                } else {
+                    binding.textNotDeliveredTitle.text = "Colis non livrés : $remainingCount à scanner / $totalToScan total"
+                    binding.textNotDeliveredSubtitle.text = "Inscannez les retours au Hub avant de régler le livreur"
+                    binding.btnInscanTab.isEnabled = true
+                    binding.btnInscanTab.backgroundTintList = ContextCompat.getColorStateList(this, R.color.badge_blue_text)
+                    binding.btnInscanTab.text = if (scannedCount > 0) "📥 Inscan au Hub ($scannedCount)" else "📥 Inscan au Hub ($totalToScan)"
+                }
+            }
+            else -> {
+                binding.cardDeliveredAction.visibility = View.GONE
+                binding.cardNotDeliveredAction.visibility = View.GONE
+            }
+        }
 
         // Update Stepper Visuals
         updateStepperVisuals(totalToScan, remainingCount)
@@ -715,7 +862,9 @@ class RiderReconciliationActivity : AppCompatActivity() {
         val uiList = filtered.map { parcel ->
             ReconcileParcelUiModel(
                 parcel = parcel,
-                isScanned = parcel.referenceNumber in scannedRefs || parcel.status == ParcelStatus.DELIVERED
+                isScanned = parcel.referenceNumber in scannedRefs || isInscanCompleted,
+                isDeliveredChecked = parcel.referenceNumber in checkedDeliveredRefs,
+                isDeliveredMode = currentFilterTab == TAB_DELIVERED || parcel.status == ParcelStatus.DELIVERED
             )
         }
 

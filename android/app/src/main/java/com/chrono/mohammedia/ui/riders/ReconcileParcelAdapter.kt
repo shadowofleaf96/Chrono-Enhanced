@@ -13,16 +13,20 @@ import androidx.recyclerview.widget.ListAdapter
 import androidx.recyclerview.widget.RecyclerView
 import com.chrono.mohammedia.R
 import com.chrono.mohammedia.data.model.ParcelDetail
+import com.chrono.mohammedia.data.model.ParcelStatus
 import com.chrono.mohammedia.databinding.ItemReconcileParcelBinding
 import java.util.Locale
 
 data class ReconcileParcelUiModel(
     val parcel: ParcelDetail,
-    val isScanned: Boolean
+    val isScanned: Boolean,
+    val isDeliveredChecked: Boolean = false,
+    val isDeliveredMode: Boolean = false
 )
 
 class ReconcileParcelAdapter(
     private val onToggleScan: (ParcelDetail, Boolean) -> Unit,
+    private val onToggleDeliveredCheck: (ParcelDetail, Boolean) -> Unit,
     private val onOpenDetails: (ParcelDetail) -> Unit
 ) : ListAdapter<ReconcileParcelUiModel, ReconcileParcelAdapter.ParcelViewHolder>(DiffCallback()) {
 
@@ -32,7 +36,7 @@ class ReconcileParcelAdapter(
             parent,
             false
         )
-        return ParcelViewHolder(binding, onToggleScan, onOpenDetails)
+        return ParcelViewHolder(binding, onToggleScan, onToggleDeliveredCheck, onOpenDetails)
     }
 
     override fun onBindViewHolder(holder: ParcelViewHolder, position: Int) {
@@ -42,6 +46,7 @@ class ReconcileParcelAdapter(
     class ParcelViewHolder(
         private val binding: ItemReconcileParcelBinding,
         private val onToggleScan: (ParcelDetail, Boolean) -> Unit,
+        private val onToggleDeliveredCheck: (ParcelDetail, Boolean) -> Unit,
         private val onOpenDetails: (ParcelDetail) -> Unit
     ) : RecyclerView.ViewHolder(binding.root) {
 
@@ -49,6 +54,7 @@ class ReconcileParcelAdapter(
             val item = model.parcel
             val isScanned = model.isScanned
             val context = binding.root.context
+            val isDelivered = model.isDeliveredMode || item.status == ParcelStatus.DELIVERED
 
             // 1. Reference Number & Copy
             binding.textParcelRef.text = item.referenceNumber
@@ -73,38 +79,90 @@ class ReconcileParcelAdapter(
                 binding.badgeAttempts.visibility = View.GONE
             }
 
-            // 3. Status Badge & Card Style based on scanned state
-            if (isScanned) {
-                // Scanned State
-                binding.cardParcel.setCardBackgroundColor(ContextCompat.getColor(context, R.color.settlement_bg))
-                binding.cardParcel.strokeColor = ContextCompat.getColor(context, R.color.settlement_border)
-                binding.cardParcel.strokeWidth = 2
-
-                binding.textStatusBadge.text = "✔ Scanné"
-                binding.textStatusBadge.setBackgroundResource(R.drawable.bg_badge_finished)
-                binding.textStatusBadge.backgroundTintList = null
-                binding.textStatusBadge.setTextColor(ContextCompat.getColor(context, R.color.status_finished_text))
-
+            // 3. Status Badge & Card Style based on tab mode
+            if (isDelivered) {
                 binding.btnActionScan.visibility = View.GONE
-                binding.btnActionUnscan.visibility = View.VISIBLE
-                binding.btnActionUnscan.setOnClickListener {
-                    onToggleScan(item, false)
+                binding.btnActionUnscan.visibility = View.GONE
+                binding.checkboxDelivered.visibility = View.VISIBLE
+
+                binding.checkboxDelivered.setOnCheckedChangeListener(null)
+                binding.checkboxDelivered.isChecked = model.isDeliveredChecked
+
+                val hasPrice = item.amount > 0.0
+                if (hasPrice) {
+                    val amtFmt = String.format(Locale.FRENCH, "%,.2f MAD", item.amount)
+                    binding.checkboxDelivered.text = "Coché ($amtFmt)"
+                } else {
+                    binding.checkboxDelivered.text = "Coché (Sans montant)"
+                }
+
+                binding.checkboxDelivered.setOnCheckedChangeListener { _, isChecked ->
+                    onToggleDeliveredCheck(item, isChecked)
+                }
+
+                if (model.isDeliveredChecked) {
+                    binding.cardParcel.setCardBackgroundColor(ContextCompat.getColor(context, R.color.settlement_bg))
+                    binding.cardParcel.strokeColor = ContextCompat.getColor(context, R.color.settlement_border)
+                    binding.cardParcel.strokeWidth = 2
+
+                    binding.textStatusBadge.text = "✔ Livré (Coché)"
+                    binding.textStatusBadge.setBackgroundResource(R.drawable.bg_badge_finished)
+                    binding.textStatusBadge.backgroundTintList = null
+                    binding.textStatusBadge.setTextColor(ContextCompat.getColor(context, R.color.status_finished_text))
+                } else {
+                    binding.cardParcel.setCardBackgroundColor(ContextCompat.getColor(context, R.color.bg_card))
+                    binding.cardParcel.strokeColor = ContextCompat.getColor(context, R.color.divider_color)
+                    binding.cardParcel.strokeWidth = 1
+
+                    binding.textStatusBadge.text = "🚚 Livré (Non coché)"
+                    binding.textStatusBadge.setBackgroundResource(R.drawable.bg_badge_code)
+                    binding.textStatusBadge.backgroundTintList = null
+                    binding.textStatusBadge.setTextColor(ContextCompat.getColor(context, R.color.text_secondary))
+                }
+
+                binding.root.setOnClickListener {
+                    onToggleDeliveredCheck(item, !model.isDeliveredChecked)
                 }
             } else {
-                // Pending State
-                binding.cardParcel.setCardBackgroundColor(ContextCompat.getColor(context, R.color.bg_card))
-                binding.cardParcel.strokeColor = ContextCompat.getColor(context, R.color.divider_color)
-                binding.cardParcel.strokeWidth = 1
+                binding.checkboxDelivered.visibility = View.GONE
 
-                binding.textStatusBadge.text = "⏳ À scanner"
-                binding.textStatusBadge.setBackgroundResource(R.drawable.bg_badge_amount)
-                binding.textStatusBadge.backgroundTintList = ContextCompat.getColorStateList(context, R.color.status_undelivered_bg)
-                binding.textStatusBadge.setTextColor(ContextCompat.getColor(context, R.color.status_undelivered_text))
+                if (isScanned) {
+                    // Scanned / Inscanned State
+                    binding.cardParcel.setCardBackgroundColor(ContextCompat.getColor(context, R.color.settlement_bg))
+                    binding.cardParcel.strokeColor = ContextCompat.getColor(context, R.color.settlement_border)
+                    binding.cardParcel.strokeWidth = 2
 
-                binding.btnActionScan.visibility = View.VISIBLE
-                binding.btnActionUnscan.visibility = View.GONE
-                binding.btnActionScan.setOnClickListener {
-                    onToggleScan(item, true)
+                    binding.textStatusBadge.text = "✔ Inscanné"
+                    binding.textStatusBadge.setBackgroundResource(R.drawable.bg_badge_finished)
+                    binding.textStatusBadge.backgroundTintList = null
+                    binding.textStatusBadge.setTextColor(ContextCompat.getColor(context, R.color.status_finished_text))
+
+                    binding.btnActionScan.visibility = View.GONE
+                    binding.btnActionUnscan.visibility = View.VISIBLE
+                    binding.btnActionUnscan.setOnClickListener {
+                        onToggleScan(item, false)
+                    }
+                } else {
+                    // Pending State
+                    binding.cardParcel.setCardBackgroundColor(ContextCompat.getColor(context, R.color.bg_card))
+                    binding.cardParcel.strokeColor = ContextCompat.getColor(context, R.color.divider_color)
+                    binding.cardParcel.strokeWidth = 1
+
+                    binding.textStatusBadge.text = "⏳ À scanner"
+                    binding.textStatusBadge.setBackgroundResource(R.drawable.bg_badge_amount)
+                    binding.textStatusBadge.backgroundTintList = ContextCompat.getColorStateList(context, R.color.status_undelivered_bg)
+                    binding.textStatusBadge.setTextColor(ContextCompat.getColor(context, R.color.status_undelivered_text))
+
+                    binding.btnActionScan.visibility = View.VISIBLE
+                    binding.btnActionScan.text = "📥 Inscan"
+                    binding.btnActionUnscan.visibility = View.GONE
+                    binding.btnActionScan.setOnClickListener {
+                        onToggleScan(item, true)
+                    }
+                }
+
+                binding.root.setOnClickListener {
+                    onOpenDetails(item)
                 }
             }
 
@@ -128,11 +186,8 @@ class ReconcileParcelAdapter(
                 binding.textCodAmount.text = "0,00 MAD"
             }
 
-            // 7. Open Details
+            // 7. Open Details Button
             binding.btnOpenDetails.setOnClickListener {
-                onOpenDetails(item)
-            }
-            binding.root.setOnClickListener {
                 onOpenDetails(item)
             }
         }

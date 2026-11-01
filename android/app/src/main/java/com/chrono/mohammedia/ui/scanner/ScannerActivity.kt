@@ -17,6 +17,7 @@ class ScannerActivity : AppCompatActivity() {
     
     private var isBatchMode = false
     private val scannedCodes = mutableSetOf<String>()
+    private var expectedCodesSet: Set<String>? = null
     
     private var toneGenerator: ToneGenerator? = null
 
@@ -29,6 +30,11 @@ class ScannerActivity : AppCompatActivity() {
         val previouslyScanned = intent.getStringArrayListExtra(EXTRA_ALREADY_SCANNED_CODES)
         if (previouslyScanned != null) {
             scannedCodes.addAll(previouslyScanned)
+        }
+
+        val expectedList = intent.getStringArrayListExtra(EXTRA_EXPECTED_CODES)
+        if (!expectedList.isNullOrEmpty()) {
+            expectedCodesSet = expectedList.toSet()
         }
         
         try {
@@ -43,7 +49,8 @@ class ScannerActivity : AppCompatActivity() {
 
         if (isBatchMode) {
             binding.layoutBatchControls.visibility = View.VISIBLE
-            binding.textScannedCount.text = "${scannedCodes.size} colis scannés"
+            val expectedCountMsg = if (expectedCodesSet != null) " / ${expectedCodesSet!!.size} prévus" else ""
+            binding.textScannedCount.text = "${scannedCodes.size} colis scannés$expectedCountMsg"
             binding.btnFinishBatch.setOnClickListener {
                 finishWithResult()
             }
@@ -55,6 +62,7 @@ class ScannerActivity : AppCompatActivity() {
             context = this,
             activity = this,
             autoBeep = false,
+            expectedCodes = expectedCodesSet,
             onBarcodeScanned = { code ->
                 handleScanResult(code)
             }
@@ -72,13 +80,17 @@ class ScannerActivity : AppCompatActivity() {
     private fun handleScanResult(code: String) {
         if (isFinishing) return
         val cleanCode = CameraXScannerHelper.cleanBarcodeValue(code)
-        if (cleanCode.isBlank()) return
+        if (!CameraXScannerHelper.isValidParcelBarcode(cleanCode, expectedCodesSet)) return
 
         if (isBatchMode) {
             if (scannedCodes.add(cleanCode)) {
                 playBeep()
                 runOnUiThread {
-                    binding.textScannedCount.text = "${scannedCodes.size} scanné(s) : $cleanCode"
+                    val isExpected = CameraXScannerHelper.isCodeInExpectedSet(cleanCode, expectedCodesSet)
+                    val expectedBadge = if (expectedCodesSet != null && expectedCodesSet!!.isNotEmpty()) {
+                        if (isExpected) " ✔" else ""
+                    } else ""
+                    binding.textScannedCount.text = "${scannedCodes.size} scanné(s) : $cleanCode$expectedBadge"
                 }
             }
         } else {
@@ -142,5 +154,6 @@ class ScannerActivity : AppCompatActivity() {
         const val EXTRA_SCANNED_CODE = "extra_scanned_code"
         const val EXTRA_SCANNED_CODES_LIST = "extra_scanned_codes_list"
         const val EXTRA_ALREADY_SCANNED_CODES = "extra_already_scanned_codes"
+        const val EXTRA_EXPECTED_CODES = "extra_expected_codes"
     }
 }

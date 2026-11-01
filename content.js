@@ -749,128 +749,6 @@
     };
   }
 
-  function ensureInscanButton() {
-    if (!location.pathname.includes("/ops/reconciliation/recon/")) return;
-    
-    const buttons = Array.from(document.querySelectorAll('button'));
-    const settleBtn = buttons.find(b => {
-      const text = b.textContent.trim().toLowerCase();
-      return text === 'settle' || text === 'reconcile' || text === 'réconcilier' || text === 'reconcilier' || text === 'régler' || text === 'regler' || text === 'settlement';
-    });
-    const cancelBtn = buttons.find(b => b.textContent.trim() === 'Cancel');
-    const reloadBtn = buttons.find(b => b.querySelector('.anticon-reload'));
-    
-    if (reloadBtn && !reloadBtn.dataset.chronoToastAttached) {
-      reloadBtn.dataset.chronoToastAttached = 'true';
-      reloadBtn.addEventListener('click', () => {
-        toastShownForUrl = null;
-      });
-    }
-
-    if (settleBtn && !document.querySelector('.chrono-inscan-ext-btn')) {
-      const container = settleBtn.parentElement;
-      const inscanBtn = document.createElement('button');
-      
-      inscanBtn.type = "button";
-      inscanBtn.className = "ant-btn ant-btn-primary chrono-inscan-ext-btn";
-      inscanBtn.style.background = "#1890ff";
-      inscanBtn.style.borderColor = "#1890ff";
-      inscanBtn.style.color = "#ffffff";
-      inscanBtn.style.fontWeight = "bold";
-      inscanBtn.style.marginRight = "8px";
-      inscanBtn.innerHTML = `<span>📥 Inscan at Hub</span>`;
-      
-      // Sequence logic: Inscan at Hub is the first button; Settle button is revealed after Inscan is clicked
-      const inscanStorageKey = 'chrono_inscan_clicked_' + location.pathname;
-      const alreadyInscanned = sessionStorage.getItem(inscanStorageKey) === 'true';
-
-      if (!alreadyInscanned) {
-        settleBtn.dataset.chronoOriginalDisplay = settleBtn.style.display || '';
-        settleBtn.style.display = 'none'; // Settle button hidden until Inscan at Hub is clicked
-      }
-      
-      // Place Inscan button as the FIRST button (before Settle)
-      container.insertBefore(inscanBtn, settleBtn);
-      
-      inscanBtn.addEventListener('click', (e) => {
-        e.preventDefault();
-        e.stopPropagation();
-        
-        sessionStorage.setItem(inscanStorageKey, 'true');
-        
-        // Reveal Settle button after Inscan is clicked
-        settleBtn.style.display = settleBtn.dataset.chronoOriginalDisplay || '';
-        settleBtn.classList.add('chrono-settle-revealed');
-
-        // Check delivered parcels once for COD settlement
-        ensureDeliveredParcelsChecked(true);
-
-        const overlay = document.querySelector('.chrono-iframe-overlay');
-        if (overlay) {
-          showInscanOverlay();
-        } else {
-          preloadInscanModal(true);
-        }
-      });
-    }
-  }
-
-  // Ensures that delivered parcels in the reconciliation table are checked for COD settlement
-  let lastCheckedReconUrl = null;
-  function ensureDeliveredParcelsChecked(force = false) {
-    if (!location.pathname.includes("/ops/reconciliation/recon/")) return;
-    if (!force && lastCheckedReconUrl === location.pathname) return;
-
-    try {
-      const rows = document.querySelectorAll('.ant-table-tbody tr.ant-table-row, tbody tr.ant-table-row');
-      let deliveredCount = 0;
-
-      rows.forEach(row => {
-        const text = row.textContent || "";
-        const isDelivered = text.includes("Delivered") || text.includes("Livré") || text.includes("Livre");
-        const isUndelivered = text.includes("Undelivered") || text.includes("Non livré") || text.includes("Attempted") || text.includes("Échoué");
-
-        if (isDelivered && !isUndelivered) {
-          deliveredCount++;
-          const cb = row.querySelector('.ant-checkbox-input, input[type="checkbox"]');
-          const wrapper = row.querySelector('.ant-checkbox, label.ant-checkbox-wrapper') || cb;
-          if (cb && !cb.checked && wrapper) {
-            wrapper.click();
-          }
-        }
-      });
-
-      if (deliveredCount > 0) {
-        lastCheckedReconUrl = location.pathname;
-      }
-
-      // Verification badge near balance
-      const balanceHeader = document.querySelector('.Component-balanceHeader-0-3-515, .Component-settleBalance-0-3-513, [class*="balanceHeader"]');
-      if (balanceHeader && !document.getElementById('chrono-all-delivered-badge')) {
-        const badge = document.createElement('div');
-        badge.id = 'chrono-all-delivered-badge';
-        badge.style.display = 'inline-flex';
-        badge.style.alignItems = 'center';
-        badge.style.gap = '6px';
-        badge.style.marginTop = '6px';
-        badge.style.padding = '4px 10px';
-        badge.style.backgroundColor = '#f6ffed';
-        badge.style.border = '1px solid #b7eb8f';
-        badge.style.borderRadius = '4px';
-        badge.style.color = '#389e0d';
-        badge.style.fontSize = '12px';
-        badge.style.fontWeight = '500';
-        badge.innerHTML = `<span>✔ Tous les colis livrés cochés pour règlement complet</span>`;
-        balanceHeader.parentElement?.appendChild(badge);
-      }
-    } catch (e) {
-      console.warn('[ChronoExt] Error checking delivered parcels:', e);
-    }
-  }
-
-
-
-
   // ── Verify Completed Trips (Rider List) ─────────────────────
 
   function ensureVerifyCompletedButton() {
@@ -1419,7 +1297,14 @@
 
     // Map known aliases to unified canonical key
     if (lower === 'walid aichi' || lower === 'omar') return 'omar';
-    if (lower === 'abd assamad krim' || lower === 'sami') return 'sami';
+    if (
+      lower === 'abd assamad krim' ||
+      lower === 'sami' ||
+      lower === 'hicham' ||
+      lower.includes('assamad') ||
+      lower.includes('krim') ||
+      lower.includes('hicham')
+    ) return 'hicham';
     if (lower === 'badr hachimi' || lower === 'bader hachimi') return 'bader hachimi';
     if (lower.includes('yourja') || lower.includes('mouhcine')) return 'mouhcine yourja';
     if (lower.includes('bahadi') || lower === 'abderrahmane bahadi' || lower === 'bahadi abderrahmane') return 'abderrahmane bahadi';
@@ -1560,7 +1445,7 @@
           ? handledTotal
           : Math.max(0, totalFromApi - (summary.notPickedUp || 0) - (summary.pendingPickup || 0));
 
-        if (canonicalDriver.includes('hachimi') || canonicalDriver.includes('bader') || canonicalDriver.includes('omar') || canonicalDriver.includes('yourja') || canonicalDriver.includes('mouhcine') || canonicalDriver.includes('bahadi')) {
+        if (canonicalDriver.includes('hachimi') || canonicalDriver.includes('bader') || canonicalDriver.includes('omar') || canonicalDriver.includes('yourja') || canonicalDriver.includes('mouhcine') || canonicalDriver.includes('bahadi') || canonicalDriver.includes('hicham')) {
           const tripRef = trip.organisation_reference_number || trip.trip_reference_number || tripId;
           console.log(`[ChronoExt] Trip ${tripRef} ("${rawDriver}" -> ${canonicalDriver}): Delivered=${delivered}, Undelivered=${undelivered}, TotalCalculated=${total}`);
         }
@@ -1648,6 +1533,21 @@
           ) {
             matched = riderData;
             break;
+          }
+        }
+      }
+
+      // Special alias: HICHAM uses Abd Assamad Krim data
+      if (!matched && (nameCanonical === 'hicham' || nameCanonical.includes('hicham'))) {
+        matched = riderStats.get('hicham') ||
+                  riderStats.get('abd assamad krim') ||
+                  riderStats.get('sami');
+        if (!matched) {
+          for (const [riderKey, riderData] of riderStats) {
+            if (riderKey.includes('assamad') || riderKey.includes('krim') || riderKey.includes('sami')) {
+              matched = riderData;
+              break;
+            }
           }
         }
       }
@@ -1850,7 +1750,6 @@
   // Watch for modal open/close on body
   const bodyObserver = new MutationObserver(() => {
     checkReconciliationToast();
-    ensureInscanButton();
     ensureVerifyCompletedButton();
     ensureDefaultFilters();
     ensureSalaryExportButton();
@@ -1873,7 +1772,6 @@
   // Fallback poll (SPA route changes may not trigger body mutations)
   setInterval(() => {
     checkReconciliationToast();
-    ensureInscanButton();
     ensureVerifyCompletedButton();
     ensureDefaultFilters();
     ensureSalaryExportButton();
@@ -2786,10 +2684,6 @@
       });
     });
   }
-
-  // Start preloading the Inscan iframe immediately on any page
-  // so it's ready by the time the user reaches the recon page
-  preloadInscanModal();
 
   console.log("[ChronoExt] Parcel Status extension loaded ✓");
 })();
