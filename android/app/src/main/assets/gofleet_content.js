@@ -1160,29 +1160,12 @@ function handleExpeditionRequests(request, sender, sendResponse) {
 chrome.runtime.onMessage.addListener(handleExpeditionRequests);
 
 // --- Start Caissier History & Snapshot Module ---
-function isConsultationOrTraitementLivreurPage() {
-  const path = window.location.pathname.toLowerCase();
-  const href = window.location.href.toLowerCase();
-  return (
-    path.includes("traitement") ||
-    href.includes("traitement") ||
-    path.includes("consultation") ||
-    href.includes("consultation") ||
-    path.includes("retour") ||
-    href.includes("retour") ||
-    document.querySelector(".js-colis-data, .js-colis-details-row, [data-colinum]") !== null
-  );
-}
-
 function isCaissierPage() {
   const path = window.location.pathname.toLowerCase();
-  const href = window.location.href.toLowerCase();
   return (
-    (path.includes("/caissier/caissier") || path.includes("/caissier")) &&
-    !path.includes("traitement") &&
-    !href.includes("traitement") &&
-    !path.includes("retour") &&
-    !href.includes("retour")
+    path.includes("/caissier/caissier") &&
+    !path.includes("/traitementlivreuxexcute") &&
+    !path.includes("/traitementlivreurexcute")
   );
 }
 
@@ -2198,72 +2181,6 @@ function extractAddress(rootItem, card) {
   return null;
 }
 
-function extractPhone(rootItem, card) {
-  // 1. Try from API rootItem or json
-  if (rootItem && typeof rootItem === "object") {
-    const candidate =
-      rootItem.Telephone ||
-      rootItem.Tel ||
-      rootItem.Phone ||
-      rootItem.Mobile ||
-      rootItem.CustomerPhone ||
-      rootItem.ClientPhone ||
-      rootItem.Contact ||
-      rootItem.NumeroTelephone ||
-      (rootItem.Colis &&
-        (rootItem.Colis.Telephone ||
-          rootItem.Colis.Tel ||
-          rootItem.Colis.Phone ||
-          rootItem.Colis.Mobile));
-    if (candidate && typeof candidate === "string" && candidate.trim()) {
-      return candidate.trim();
-    }
-  }
-
-  // 2. Try from card DOM
-  if (card && card.querySelector) {
-    const attrPhone =
-      card.getAttribute("data-phone") ||
-      card.getAttribute("data-tel") ||
-      card.getAttribute("data-telephone");
-    if (attrPhone && attrPhone.trim()) return attrPhone.trim();
-
-    const selectors = [
-      ".js-phone",
-      ".js-telephone",
-      ".phone",
-      ".telephone",
-      ".tel",
-      "a[href^='tel:']",
-    ];
-    for (const sel of selectors) {
-      const el = card.querySelector(sel);
-      if (el && el.textContent.trim()) {
-        const text = el.textContent
-          .replace(/^t[ée]l[ée]phone\s*[:：]?\s*/i, "")
-          .replace(/^tel\s*[:：]?\s*/i, "")
-          .trim();
-        if (text) return text;
-      }
-    }
-
-    const elements = card.querySelectorAll("p, span, div, label, td, b, strong");
-    for (const el of elements) {
-      if (el.children.length === 0) {
-        const text = el.textContent.trim();
-        const match =
-          text.match(/(?:t[ée]l(?:[ée]phone)?|contact|mobile)\s*[:：]\s*(\+?[0-9\s-]{8,})/i) ||
-          text.match(/\b(\+?212[0-9\s-]{9,}|0[567][0-9\s-]{8,})\b/);
-        if (match && match[1]) {
-          return match[1].trim();
-        }
-      }
-    }
-  }
-
-  return null;
-}
-
 // In-memory & session cache for ZoneColisList data
 let zoneColisCache = null;
 let zoneColisCacheTime = 0;
@@ -2510,29 +2427,22 @@ function getActiveZoneId() {
 }
 
 async function processConsultationPageCalls() {
-  if (!isConsultationOrTraitementLivreurPage()) {
+  const currentPath = window.location.pathname.toLowerCase();
+  const currentHref = window.location.href.toLowerCase();
+  if (
+    !currentPath.includes("/hub/consultation/") &&
+    !currentPath.includes("/caissier/caissier/traitementlivreurexcute") &&
+    !currentHref.includes("traitementlivreurexcute")
+  ) {
     return;
   }
 
   const cardSelector =
-    ".js-colis-data:not(.calls-processed):not(.calls-processing), " +
-    ".js-colis-details-row:not(.calls-processed):not(.calls-processing), " +
-    "#js-colis-list-infos .card:not(.calls-processed):not(.calls-processing), " +
-    "#js-colis-list-info .card:not(.calls-processed):not(.calls-processing), " +
-    ".colis-card:not(.calls-processed):not(.calls-processing), " +
-    "[data-colinum]:not(.calls-processed):not(.calls-processing), " +
-    ".card:not(.calls-processed):not(.calls-processing)";
+    ".js-colis-data:not(.calls-processed):not(.calls-processing), .js-colis-details-row:not(.calls-processed):not(.calls-processing)";
   const rawCards = Array.from(document.querySelectorAll(cardSelector));
-  const cards = rawCards.filter((card) => {
-    if (card.parentElement?.closest(".js-colis-data, .js-colis-details-row, .colis-card")) return false;
-    if (card.querySelector(".js-colis-data, .js-colis-details-row, .colis-card")) return false;
-    const text = card.textContent || "";
-    return card.hasAttribute("data-colinum") ||
-           card.hasAttribute("data-colis") ||
-           /\b(?:GOF|GMK|GMH|GFS|GTG|GRB)[A-Za-z0-9]+\b/i.test(text) ||
-           /Colis\s*N°/i.test(text) ||
-           /Retour\s*N°/i.test(text);
-  });
+  const cards = rawCards.filter(
+    (card) => !card.parentElement?.closest(".js-colis-data, .js-colis-details-row")
+  );
   if (cards.length === 0) return;
 
   cards.forEach((card) => card.classList.add("calls-processing"));
@@ -2540,11 +2450,7 @@ async function processConsultationPageCalls() {
   const zoneId = getActiveZoneId();
   let zoneColisMap = {};
   try {
-    const zoneColisPromise = Promise.race([
-      getZoneColisData(zoneId),
-      new Promise((resolve) => setTimeout(() => resolve({}), 8000))
-    ]);
-    zoneColisMap = await zoneColisPromise;
+    zoneColisMap = await getZoneColisData(zoneId);
   } catch (err) {
     console.warn("GoFleet: could not load zone colis data", err);
   }
@@ -2554,19 +2460,12 @@ async function processConsultationPageCalls() {
     card.classList.add("calls-processed");
     let colinum =
       card.getAttribute("data-colinum") ||
-      card.getAttribute("data-colis") ||
-      card.getAttribute("data-code") ||
       card.querySelector("h6.style-87")?.textContent?.replace(/Colis\s*N°/i, "").trim() ||
-      card.querySelector(".text-green")?.textContent?.replace(/Colis\s*N°/i, "").trim() ||
-      card.querySelector(".colis-num, .tracking-number, .js-barcode-text")?.textContent?.trim();
+      card.querySelector(".text-green")?.textContent?.replace(/Colis\s*N°/i, "").trim();
 
     if (!colinum) {
       const cardText = card.textContent || "";
-      const match =
-        cardText.match(/\b((?:GOF|GMK|GMH|GFS|GTG|GRB)[A-Za-z0-9]+)\b/i) ||
-        cardText.match(/\b([A-Z]{2}[0-9]{9}[A-Z]{2})\b/) ||
-        cardText.match(/\b(CD[0-9]{9})\b/) ||
-        cardText.match(/\b(LCWK[0-9A-Z]+)\b/i);
+      const match = cardText.match(/\b((?:GOF|GMK|GMH|GFS|GTG|GRB)[A-Za-z0-9]+)\b/i);
       if (match) {
         colinum = match[1].trim();
       }
@@ -2583,9 +2482,8 @@ async function processConsultationPageCalls() {
     const apiColisNum = colinum.endsWith("A") ? colinum : colinum + "A";
 
     try {
-      const baseUrl = window.location.origin || "https://tms.marjanemall.ma";
       const response = await fetch(
-        `${baseUrl}/AffectationLivreur/Affectation/GetColisHistorique?cab=${apiColisNum}`,
+        `https://tms.marjanemall.ma/AffectationLivreur/Affectation/GetColisHistorique?cab=${apiColisNum}`,
         { credentials: "include" }
       );
       const json = await response.json();
@@ -2614,6 +2512,10 @@ async function processConsultationPageCalls() {
         }
       }
 
+      if (typeof registerTraitementColisTracking === "function") {
+        registerTraitementColisTracking(colinum, apiColisNum, rootItem, details);
+      }
+
       const clientName =
         (zoneInfo && zoneInfo.client) ||
         extractClientName(rootItem || (json && json.data) || json, card);
@@ -2623,9 +2525,7 @@ async function processConsultationPageCalls() {
       const address =
         (zoneInfo && zoneInfo.address) ||
         extractAddress(rootItem || (json && json.data) || json, card);
-      const phone =
-        (zoneInfo && zoneInfo.phone) ||
-        extractPhone(rootItem || (json && json.data) || json, card);
+      const phone = (zoneInfo && zoneInfo.phone) || null;
 
       const deliveryAttempts = [];
       let currentAttempt = null;
@@ -2634,7 +2534,7 @@ async function processConsultationPageCalls() {
         details.forEach((item) => {
           const status = item.ColisStatut || "";
 
-          if (status.includes("Pris en charge") || status.includes("Sorti pour livraison") || status.includes("livreur")) {
+          if (status.includes("Pris en charge livreur")) {
             currentAttempt = {
               date: parseJsonDateTime(item.DateColis, item.TimeColis),
               injoignableItems: [],
@@ -2642,14 +2542,7 @@ async function processConsultationPageCalls() {
             deliveryAttempts.push(currentAttempt);
           }
 
-          if (status.includes("Injoignable")) {
-            if (!currentAttempt) {
-              currentAttempt = {
-                date: parseJsonDateTime(item.DateColis, item.TimeColis),
-                injoignableItems: [],
-              };
-              deliveryAttempts.push(currentAttempt);
-            }
+          if (status.includes("Injoignable") && currentAttempt) {
             const date = parseJsonDateTime(item.DateColis, item.TimeColis);
             currentAttempt.injoignableItems.push({ date, item });
           }
@@ -2937,22 +2830,25 @@ async function processConsultationPageCalls() {
   });
 }
 
+const currentPath = window.location.pathname.toLowerCase();
+const currentHref = window.location.href.toLowerCase();
 var consultationObserver = null;
-if (isConsultationOrTraitementLivreurPage()) {
+if (
+  currentPath.includes("/hub/consultation/") ||
+  currentPath.includes("/caissier/caissier/traitementlivreurexcute") ||
+  currentHref.includes("traitementlivreurexcute")
+) {
   function startConsultationObserver() {
     if (document.body && document.body instanceof Node) {
       if (consultationObserver) consultationObserver.disconnect();
       consultationObserver = new MutationObserver(() => {
         processConsultationPageCalls();
-        extractRefusedColis();
       });
 
       consultationObserver.observe(document.body, { childList: true, subtree: true });
       processConsultationPageCalls();
-      extractRefusedColis();
-      setTimeout(processConsultationPageCalls, 500);
-      setTimeout(processConsultationPageCalls, 1500);
-      setTimeout(processConsultationPageCalls, 3000);
+      setTimeout(processConsultationPageCalls, 1000);
+      setTimeout(processConsultationPageCalls, 2500);
     } else {
       setTimeout(startConsultationObserver, 200);
     }
@@ -3033,6 +2929,1046 @@ if (
   setTimeout(updateColisCounter, 1000);
 }
 // --- End Colis Counter ---
+
+// =========================================================================
+// --- Start TraitementLivreurExcute Scan Validation Module ---
+// Validates that barcode scans on TraitementLivreurExcute only accept parcels
+// and tracking codes present on the current page. Blocks unknown scans and
+// shows an error modal with audio warning.
+// =========================================================================
+
+(function initTraitementScanModule() {
+  if (window.__gofleetTraitementValidationLoaded) return;
+  window.__gofleetTraitementValidationLoaded = true;
+
+  // Trackings and Colis discovered dynamically or via API
+  const pageDiscoveredCodes = new Set();
+  window.__gofleetPageTrackings = pageDiscoveredCodes;
+
+  // Helper: check if we are on the TraitementLivreurExcute page
+  function isTraitementPage() {
+    const path = (window.location.pathname || "").toLowerCase();
+    const href = (window.location.href || "").toLowerCase();
+    return (
+      path.includes("/caissier/caissier/traitementlivreurexcute") ||
+      path.includes("traitementlivreurexcute") ||
+      href.includes("traitementlivreurexcute") ||
+      path.includes("traitementlivreuxexcute") ||
+      href.includes("traitementlivreuxexcute")
+    );
+  }
+
+  // Register codes retrieved from GetColisHistorique or other sources
+  window.registerTraitementColisTracking = function (colinum, apiColisNum, rootItem, details) {
+    if (colinum) addDiscoveredCode(colinum);
+    if (apiColisNum) addDiscoveredCode(apiColisNum);
+    if (rootItem) {
+      if (rootItem.ColisNum) addDiscoveredCode(rootItem.ColisNum);
+      if (rootItem.TrackingCode) addDiscoveredCode(rootItem.TrackingCode);
+    }
+    if (Array.isArray(details)) {
+      details.forEach((d) => {
+        if (d.ColisNum) addDiscoveredCode(d.ColisNum);
+        if (d.TrackingCode) addDiscoveredCode(d.TrackingCode);
+      });
+    }
+  };
+
+  function addDiscoveredCode(str) {
+    if (!str || typeof str !== "string") return;
+    const clean = str.replace(/[\x00-\x1F\x7F]/g, "").trim().toUpperCase();
+    if (clean.length >= 3) {
+      pageDiscoveredCodes.add(clean);
+      if (clean.endsWith("A")) {
+        pageDiscoveredCodes.add(clean.slice(0, -1));
+      } else {
+        pageDiscoveredCodes.add(clean + "A");
+      }
+    }
+  }
+
+  function cleanScanValue(val) {
+    if (!val || typeof val !== "string") return "";
+    return val.replace(/[\x00-\x1F\x7F]/g, "").trim().toUpperCase();
+  }
+
+  function injectTraitementStyles() {
+    if (document.getElementById("gofleet-traitement-styles")) return;
+    const style = document.createElement("style");
+    style.id = "gofleet-traitement-styles";
+    style.textContent = `
+      @keyframes gofleetFadeIn {
+        from { opacity: 0; }
+        to { opacity: 1; }
+      }
+      @keyframes gofleetScaleIn {
+        from { opacity: 0; transform: scale(0.92); }
+        to { opacity: 1; transform: scale(1); }
+      }
+      #gofleet-scan-error-overlay * {
+        box-sizing: border-box !important;
+      }
+    `;
+    (document.head || document.documentElement).appendChild(style);
+  }
+
+  // Find scan input on the page
+  function findScanInput() {
+    let el = document.getElementById("js-barcode-input");
+    if (el) return el;
+
+    el = document.querySelector(
+      "input#js-barcode-input, " +
+      "input[name*='barcode' i], input[id*='barcode' i], " +
+      "input[name*='colis' i], input[id*='colis' i], " +
+      "input[name*='tracking' i], input[id*='tracking' i], " +
+      "input[name*='cab' i], input[id*='cab' i], " +
+      "input[placeholder*='colis' i], input[placeholder*='scan' i], " +
+      "input[placeholder*='tracking' i], input[placeholder*='code' i], " +
+      "input[placeholder*='barre' i]"
+    );
+    if (el) return el;
+
+    const visibleInputs = Array.from(document.querySelectorAll("input[type='text'], input:not([type])"));
+    for (const input of visibleInputs) {
+      if (input.readOnly || input.disabled || input.type === "hidden") continue;
+      if (input.name === "dateFilter" || input.id === "dateFilter") continue;
+      const rect = input.getBoundingClientRect();
+      if (rect.width > 0 && rect.height > 0) return input;
+    }
+    return null;
+  }
+
+  // Collect all parcel and tracking codes available across the DOM
+  function collectAllPageCodes() {
+    const codes = new Set(pageDiscoveredCodes);
+
+    function register(c) {
+      if (!c || typeof c !== "string") return;
+      const clean = c.replace(/[\x00-\x1F\x7F]/g, "").trim().toUpperCase();
+      if (clean.length >= 3) {
+        codes.add(clean);
+        if (clean.endsWith("A")) {
+          codes.add(clean.slice(0, -1));
+        } else {
+          codes.add(clean + "A");
+        }
+      }
+    }
+
+    // 1. All parcel card containers
+    const cards = document.querySelectorAll(
+      ".js-colis-data, .js-colis-details-row, [data-colinum], [data-numcolis], .caissier-card"
+    );
+
+    cards.forEach((card) => {
+      // Attributes
+      register(card.getAttribute("data-colinum"));
+      register(card.getAttribute("data-numcolis"));
+      register(card.getAttribute("data-tracking"));
+      register(card.getAttribute("data-trackingcode"));
+      register(card.getAttribute("data-barcode"));
+      register(card.getAttribute("data-cab"));
+      register(card.getAttribute("data-code"));
+
+      // Element text headers
+      const headers = card.querySelectorAll("h6.style-87, h6, .card-title, .text-green");
+      headers.forEach((h) => {
+        const text = h.textContent.trim();
+        const m = text.match(/Colis\s*N°\s*([A-Za-z0-9_-]+)/i) || text.match(/([A-Za-z0-9_-]{5,})/);
+        if (m) register(m[1]);
+      });
+
+      // Scan card's text for prefixes & patterns
+      const text = card.textContent || "";
+      const prefixMatches = text.match(/\b(?:GOF|GMK|GMH|GFS|GTG|GRB)[0-9A-Za-z]+\b/gi);
+      if (prefixMatches) prefixMatches.forEach(register);
+
+      const labelMatches = text.match(/(?:tracking|suivi|cab|code\s*barre|envoi|colis)\s*(?:n°|#|:)?\s*([A-Za-z0-9_-]{5,})/gi);
+      if (labelMatches) {
+        labelMatches.forEach((m) => {
+          const parts = m.split(/[:#]/);
+          if (parts.length > 1) register(parts[1].trim());
+        });
+      }
+
+      const longNumMatches = text.match(/\b\d{10,24}\b/g);
+      if (longNumMatches) longNumMatches.forEach(register);
+
+      const generalMatches = text.match(/\b[A-Z]{2,4}\d{5,}[A-Z0-9]*\b/gi);
+      if (generalMatches) generalMatches.forEach(register);
+    });
+
+    // 2. Table rows (in case rendered as table)
+    const rows = document.querySelectorAll("table tbody tr, table tr");
+    rows.forEach((row) => {
+      if (row.querySelector("th") && !row.querySelector("td")) return;
+      register(row.getAttribute("data-colinum"));
+      register(row.getAttribute("data-numcolis"));
+      register(row.getAttribute("data-tracking"));
+      register(row.getAttribute("data-barcode"));
+      register(row.getAttribute("data-cab"));
+
+      const cells = row.querySelectorAll("td");
+      cells.forEach((cell) => {
+        const cText = cell.textContent.trim();
+        const m = cText.match(/\b(?:GOF|GMK|GMH|GFS|GTG|GRB)[0-9A-Za-z]+\b/i) ||
+                  cText.match(/\b\d{10,24}\b/) ||
+                  cText.match(/\b[A-Z]{2,4}\d{5,}[A-Z0-9]*\b/i);
+        if (m) register(m[0]);
+      });
+    });
+
+    return codes;
+  }
+
+  // Check if a scanned code is present on the page
+  function isCodeExistingOnPage(cleanVal) {
+    if (!cleanVal || cleanVal.length < 3) return false;
+
+    const allCodes = collectAllPageCodes();
+    if (allCodes.has(cleanVal)) return true;
+    if (cleanVal.endsWith("A") && allCodes.has(cleanVal.slice(0, -1))) return true;
+    if (allCodes.has(cleanVal + "A")) return true;
+
+    // Word-boundary search in card / row elements
+    const elements = document.querySelectorAll(
+      ".js-colis-data, .js-colis-details-row, table tbody tr"
+    );
+    const escaped = cleanVal.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+    const reg = new RegExp(`(^|[^A-Z0-9])${escaped}([^A-Z0-9]|$)`, "i");
+
+    const withoutA = cleanVal.endsWith("A") ? cleanVal.slice(0, -1) : null;
+    const withA = cleanVal.endsWith("A") ? null : cleanVal + "A";
+    const regWithoutA = withoutA ? new RegExp(`(^|[^A-Z0-9])${withoutA.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}([^A-Z0-9]|$)`, "i") : null;
+    const regWithA = withA ? new RegExp(`(^|[^A-Z0-9])${withA.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}([^A-Z0-9]|$)`, "i") : null;
+
+    for (const el of elements) {
+      const text = (el.textContent || "").toUpperCase();
+      if (reg.test(text)) return true;
+      if (regWithoutA && regWithoutA.test(text)) return true;
+      if (regWithA && regWithA.test(text)) return true;
+    }
+
+    return false;
+  }
+
+  // Play audio warning tone
+  function playErrorBeep() {
+    try {
+      const AudioCtx = window.AudioContext || window.webkitAudioContext;
+      if (!AudioCtx) return;
+      const ctx = new AudioCtx();
+      if (ctx.state === "suspended") ctx.resume();
+
+      const osc = ctx.createOscillator();
+      const gain = ctx.createGain();
+
+      osc.type = "sawtooth";
+      osc.frequency.setValueAtTime(360, ctx.currentTime);
+      osc.frequency.setValueAtTime(220, ctx.currentTime + 0.12);
+
+      gain.gain.setValueAtTime(0.3, ctx.currentTime);
+      gain.gain.exponentialRampToValueAtTime(0.01, ctx.currentTime + 0.28);
+
+      osc.connect(gain);
+      gain.connect(ctx.destination);
+
+      osc.start();
+      osc.stop(ctx.currentTime + 0.3);
+    } catch (e) {}
+  }
+
+  // Show error modal for unauthorized / unlisted tracking
+  function showScanErrorModal(code) {
+    injectTraitementStyles();
+    const existing = document.getElementById("gofleet-scan-error-overlay");
+    if (existing) existing.remove();
+
+    playErrorBeep();
+
+    const overlay = document.createElement("div");
+    overlay.id = "gofleet-scan-error-overlay";
+    Object.assign(overlay.style, {
+      position: "fixed",
+      top: "0",
+      left: "0",
+      width: "100vw",
+      height: "100vh",
+      backgroundColor: "rgba(15, 23, 42, 0.8)",
+      backdropFilter: "blur(4px)",
+      display: "flex",
+      alignItems: "center",
+      justifyContent: "center",
+      zIndex: "999999",
+      fontFamily: "-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif",
+      animation: "gofleetFadeIn 0.2s ease-out"
+    });
+
+    const modal = document.createElement("div");
+    Object.assign(modal.style, {
+      backgroundColor: "#ffffff",
+      borderRadius: "16px",
+      padding: "28px 32px",
+      maxWidth: "460px",
+      width: "90%",
+      boxShadow: "0 25px 50px -12px rgba(0, 0, 0, 0.4)",
+      textAlign: "center",
+      border: "2px solid #ef4444",
+      animation: "gofleetScaleIn 0.2s ease-out"
+    });
+
+    const iconDiv = document.createElement("div");
+    iconDiv.textContent = "✕";
+    Object.assign(iconDiv.style, {
+      width: "60px",
+      height: "60px",
+      borderRadius: "50%",
+      backgroundColor: "#fee2e2",
+      color: "#dc2626",
+      fontSize: "30px",
+      fontWeight: "bold",
+      display: "flex",
+      alignItems: "center",
+      justifyContent: "center",
+      margin: "0 auto 16px auto",
+      boxShadow: "0 4px 12px rgba(239, 68, 68, 0.25)"
+    });
+
+    const title = document.createElement("h3");
+    title.textContent = "Colis Non Autorisé / Inexistant";
+    Object.assign(title.style, {
+      color: "#991b1b",
+      fontSize: "20px",
+      fontWeight: "700",
+      margin: "0 0 12px 0"
+    });
+
+    const codeBox = document.createElement("div");
+    codeBox.textContent = code;
+    Object.assign(codeBox.style, {
+      display: "inline-block",
+      backgroundColor: "#fef2f2",
+      border: "1px dashed #f87171",
+      color: "#b91c1c",
+      padding: "8px 16px",
+      borderRadius: "8px",
+      fontSize: "17px",
+      fontWeight: "700",
+      letterSpacing: "1px",
+      fontFamily: "monospace",
+      margin: "0 0 14px 0",
+      wordBreak: "break-all"
+    });
+
+    const desc = document.createElement("p");
+    desc.textContent = "Ce numéro de colis ou tracking n'existe pas dans cette tournée sur cette page. Le scan a été bloqué pour éviter toute erreur de traitement.";
+    Object.assign(desc.style, {
+      color: "#4b5563",
+      fontSize: "14px",
+      lineHeight: "1.5",
+      margin: "0 0 24px 0"
+    });
+
+    const closeBtn = document.createElement("button");
+    closeBtn.type = "button";
+    closeBtn.textContent = "OK, Compris";
+    Object.assign(closeBtn.style, {
+      backgroundColor: "#dc2626",
+      color: "#ffffff",
+      border: "none",
+      padding: "11px 28px",
+      borderRadius: "8px",
+      fontSize: "15px",
+      fontWeight: "600",
+      cursor: "pointer",
+      boxShadow: "0 4px 12px rgba(220, 38, 38, 0.3)",
+      outline: "none",
+      transition: "background-color 0.2s"
+    });
+
+    closeBtn.onmouseover = () => { closeBtn.style.backgroundColor = "#b91c1c"; };
+    closeBtn.onmouseout = () => { closeBtn.style.backgroundColor = "#dc2626"; };
+
+    function closeModal() {
+      window.removeEventListener("keydown", handleModalKeydown, true);
+      overlay.remove();
+      const input = findScanInput();
+      if (input) {
+        input.value = "";
+        setTimeout(() => {
+          try { input.focus(); } catch (e) {}
+        }, 50);
+      }
+    }
+
+    function handleModalKeydown(e) {
+      if (e.key === "Enter" || e.key === "Escape" || e.key === " " || e.keyCode === 13 || e.keyCode === 27) {
+        e.preventDefault();
+        e.stopPropagation();
+        e.stopImmediatePropagation();
+        closeModal();
+      }
+    }
+
+    closeBtn.addEventListener("click", (e) => {
+      e.preventDefault();
+      e.stopPropagation();
+      closeModal();
+    });
+
+    window.addEventListener("keydown", handleModalKeydown, true);
+
+    modal.appendChild(iconDiv);
+    modal.appendChild(title);
+    modal.appendChild(codeBox);
+    modal.appendChild(desc);
+    modal.appendChild(closeBtn);
+    overlay.appendChild(modal);
+    document.body.appendChild(overlay);
+
+    setTimeout(() => {
+      try { closeBtn.focus(); } catch (e) {}
+    }, 50);
+  }
+
+  // Intercept scan attempts
+  function interceptScan(e, inputEl) {
+    if (!isTraitementPage()) return;
+    if (!inputEl) inputEl = findScanInput();
+    if (!inputEl) return;
+
+    const rawVal = inputEl.value || "";
+    const cleanVal = cleanScanValue(rawVal);
+    if (!cleanVal) return;
+
+    if (!isCodeExistingOnPage(cleanVal)) {
+      // BLOCK SCAN COMPLETELY
+      e.preventDefault();
+      e.stopPropagation();
+      e.stopImmediatePropagation();
+
+      inputEl.value = "";
+      showScanErrorModal(cleanVal);
+      return false;
+    }
+  }
+
+  // 1. CAPTURING KEYDOWN
+  document.addEventListener(
+    "keydown",
+    (e) => {
+      if (!isTraitementPage()) return;
+      if (e.key !== "Enter" && e.keyCode !== 13) return;
+
+      const target = e.target;
+      if (!target || target.tagName !== "INPUT") return;
+      if (target.type === "hidden" || target.readOnly || target.disabled) return;
+      if (target.name === "dateFilter" || target.id === "dateFilter") return;
+
+      interceptScan(e, target);
+    },
+    true
+  );
+
+  // 2. CAPTURING KEYPRESS
+  document.addEventListener(
+    "keypress",
+    (e) => {
+      if (!isTraitementPage()) return;
+      if (e.key !== "Enter" && e.keyCode !== 13) return;
+
+      const target = e.target;
+      if (!target || target.tagName !== "INPUT") return;
+      if (target.type === "hidden" || target.readOnly || target.disabled) return;
+      if (target.name === "dateFilter" || target.id === "dateFilter") return;
+
+      const cleanVal = cleanScanValue(target.value);
+      if (cleanVal && !isCodeExistingOnPage(cleanVal)) {
+        e.preventDefault();
+        e.stopPropagation();
+        e.stopImmediatePropagation();
+        return false;
+      }
+    },
+    true
+  );
+
+  // 3. CAPTURING FORM SUBMIT
+  document.addEventListener(
+    "submit",
+    (e) => {
+      if (!isTraitementPage()) return;
+      const form = e.target;
+      if (!form || form.tagName !== "FORM") return;
+
+      const input = form.querySelector("input#js-barcode-input, input[type='text'], input:not([type])");
+      if (input) {
+        interceptScan(e, input);
+      }
+    },
+    true
+  );
+
+  // 4. CAPTURING BUTTON CLICK
+  document.addEventListener(
+    "click",
+    (e) => {
+      if (!isTraitementPage()) return;
+      const btn = e.target.closest("button, input[type='submit'], .btn, a.btn");
+      if (!btn) return;
+
+      const scanInput = findScanInput();
+      if (!scanInput) return;
+      if (btn.contains(scanInput)) return;
+
+      const cleanVal = cleanScanValue(scanInput.value);
+      if (cleanVal && !isCodeExistingOnPage(cleanVal)) {
+        const btnText = (btn.textContent || "").toLowerCase();
+        if (
+          btn.type === "submit" ||
+          btn.closest("form") === scanInput.closest("form") ||
+          btnText.includes("scan") ||
+          btnText.includes("valid") ||
+          btnText.includes("cherch")
+        ) {
+          e.preventDefault();
+          e.stopPropagation();
+          e.stopImmediatePropagation();
+          scanInput.value = "";
+          showScanErrorModal(cleanVal);
+          return false;
+        }
+      }
+    },
+    true
+  );
+
+  // 5. Visual Security Badge
+  function updateSecurityBadge() {
+    if (!isTraitementPage()) return;
+    const input = findScanInput();
+    if (!input) return;
+
+    let badge = document.getElementById("gofleet-scan-security-badge");
+    const count = document.querySelectorAll(
+      ".js-colis-data, .js-colis-details-row, [data-colinum]"
+    ).length;
+
+    if (!badge) {
+      badge = document.createElement("div");
+      badge.id = "gofleet-scan-security-badge";
+      Object.assign(badge.style, {
+        display: "inline-flex",
+        alignItems: "center",
+        gap: "6px",
+        fontSize: "12px",
+        fontWeight: "600",
+        color: "#065f46",
+        backgroundColor: "#d1fae5",
+        border: "1px solid #a7f3d0",
+        padding: "4px 10px",
+        borderRadius: "20px",
+        margin: "6px 0",
+        width: "fit-content",
+        transition: "all 0.3s ease"
+      });
+
+      const parent = input.parentElement;
+      if (parent) {
+        parent.insertBefore(badge, input);
+      }
+    }
+
+    if (count > 0) {
+      badge.innerHTML = `🛡️ <strong>Scan Sécurisé :</strong> ${count} colis autorisés sur cette page`;
+      badge.style.backgroundColor = "#d1fae5";
+      badge.style.color = "#065f46";
+      badge.style.borderColor = "#a7f3d0";
+    } else {
+      badge.innerHTML = `🛡️ <strong>Scan Sécurisé :</strong> En attente de détection des colis...`;
+      badge.style.backgroundColor = "#fef3c7";
+      badge.style.color = "#92400e";
+      badge.style.borderColor = "#fde68a";
+    }
+  }
+
+  if (document.body && document.body instanceof Node) {
+    const observer = new MutationObserver(() => {
+      if (isTraitementPage()) {
+        updateSecurityBadge();
+      }
+    });
+    observer.observe(document.body, { childList: true, subtree: true });
+  }
+
+  setTimeout(updateSecurityBadge, 500);
+  setTimeout(updateSecurityBadge, 1500);
+  setTimeout(updateSecurityBadge, 3000);
+})();
+
+// =========================================================================
+// --- End TraitementLivreurExcute Scan Validation Module ---
+// =========================================================================
+
+// =========================================================================
+// --- Start Affectation / Palette GMH Scan Validation Module ---
+// On AffectationAir, AffectationTournee, and Palette scan pages:
+// Blocks all parcel scans that do NOT begin with GMH (e.g. GOF, GMK, GFS, etc.).
+// Allows GMH parcels and returns (random letters/numbers) to scan normally.
+// =========================================================================
+
+(function initGmhScanModule() {
+  if (window.__gofleetGmhValidationLoaded) return;
+  window.__gofleetGmhValidationLoaded = true;
+
+  // Check if current page is AffectationAir, AffectationTournee, or a Palette scan page
+  function isGmhFilterPage() {
+    const path = (window.location.pathname || "").toLowerCase();
+    const href = (window.location.href || "").toLowerCase();
+
+    return (
+      path.includes("/affectationlivreur/affectationair") ||
+      href.includes("affectationair") ||
+      path.includes("/affectationlivreur/affectationtournee") ||
+      href.includes("affectationtournee") ||
+      path.includes("/tourneemm/expedition/editpalettewithcolis") ||
+      path.includes("editpalettewithcolis") ||
+      href.includes("editpalettewithcolis") ||
+      path.includes("editpalette") ||
+      href.includes("editpalette") ||
+      path.includes("palette") ||
+      href.includes("palette")
+    );
+  }
+
+  // Clean raw scan value
+  function cleanScanValue(val) {
+    if (!val || typeof val !== "string") return "";
+    return val.replace(/[\x00-\x1F\x7F]/g, "").trim().toUpperCase();
+  }
+
+  // Determine if a code is a non-GMH parcel that should be blocked
+  // Rules:
+  // - GMH parcels (starts with GMH) -> ALLOWED (returns false)
+  // - Outbound parcels starting with GOF, GMK, GFS, GTG, GRB or general G[A-Z]{2}\d+ -> BLOCKED (returns true)
+  // - Returns with random alphabets/numbers (e.g. numeric barcodes, RC..., RET..., etc.) -> ALLOWED (returns false)
+  function isNonGmhParcel(code) {
+    if (!code || typeof code !== "string") return false;
+    const clean = code.trim().toUpperCase();
+
+    // 1. If it begins with GMH, it is an authorized parcel for this hub
+    if (clean.startsWith("GMH")) {
+      return false;
+    }
+
+    // 2. Known GoFleet other-hub parcel prefixes: Casablanca (GOF), Marrakech (GMK), Fes (GFS), Tanger (GTG), Rabat (GRB)
+    const otherParcelPrefixes = ["GOF", "GMK", "GFS", "GTG", "GRB"];
+    if (otherParcelPrefixes.some((p) => clean.startsWith(p))) {
+      return true;
+    }
+
+    // 3. General GoFleet parcel pattern: 'G' followed by 2 letters and digits (e.g. GXX123456)
+    if (/^G[A-Z]{2}\d/i.test(clean)) {
+      return true;
+    }
+
+    // 4. Otherwise, it is a return (random alphabets and numbers, e.g. numeric barcodes, RC..., RET..., etc.)
+    return false;
+  }
+
+  function injectGmhStyles() {
+    if (document.getElementById("gofleet-gmh-styles")) return;
+    const style = document.createElement("style");
+    style.id = "gofleet-gmh-styles";
+    style.textContent = `
+      @keyframes gofleetGmhFadeIn {
+        from { opacity: 0; }
+        to { opacity: 1; }
+      }
+      @keyframes gofleetGmhScaleIn {
+        from { opacity: 0; transform: scale(0.92); }
+        to { opacity: 1; transform: scale(1); }
+      }
+      #gofleet-gmh-error-overlay * {
+        box-sizing: border-box !important;
+      }
+    `;
+    (document.head || document.documentElement).appendChild(style);
+  }
+
+  // Find scan input on page
+  function findScanInput() {
+    let el = document.getElementById("js-barcode-input");
+    if (el) return el;
+
+    el = document.querySelector(
+      "input#js-barcode-input, " +
+      "input[name*='barcode' i], input[id*='barcode' i], " +
+      "input[name*='colis' i], input[id*='colis' i], " +
+      "input[name*='tracking' i], input[id*='tracking' i], " +
+      "input[name*='cab' i], input[id*='cab' i], " +
+      "input[placeholder*='colis' i], input[placeholder*='scan' i], " +
+      "input[placeholder*='tracking' i], input[placeholder*='code' i], " +
+      "input[placeholder*='barre' i]"
+    );
+    if (el) return el;
+
+    const visibleInputs = Array.from(document.querySelectorAll("input[type='text'], input:not([type])"));
+    for (const input of visibleInputs) {
+      if (input.readOnly || input.disabled || input.type === "hidden") continue;
+      if (input.name === "dateFilter" || input.id === "dateFilter") continue;
+      const rect = input.getBoundingClientRect();
+      if (rect.width > 0 && rect.height > 0) return input;
+    }
+    return null;
+  }
+
+  // Play audio warning beep
+  function playGmhErrorBeep() {
+    try {
+      const AudioCtx = window.AudioContext || window.webkitAudioContext;
+      if (!AudioCtx) return;
+      const ctx = new AudioCtx();
+      if (ctx.state === "suspended") ctx.resume();
+
+      const osc = ctx.createOscillator();
+      const gain = ctx.createGain();
+
+      osc.type = "sawtooth";
+      osc.frequency.setValueAtTime(400, ctx.currentTime);
+      osc.frequency.setValueAtTime(220, ctx.currentTime + 0.12);
+
+      gain.gain.setValueAtTime(0.3, ctx.currentTime);
+      gain.gain.exponentialRampToValueAtTime(0.01, ctx.currentTime + 0.3);
+
+      osc.connect(gain);
+      gain.connect(ctx.destination);
+
+      osc.start();
+      osc.stop(ctx.currentTime + 0.32);
+    } catch (e) {}
+  }
+
+  // Show error modal for non-GMH parcel
+  function showGmhErrorModal(code) {
+    injectGmhStyles();
+    const existing = document.getElementById("gofleet-gmh-error-overlay");
+    if (existing) existing.remove();
+
+    playGmhErrorBeep();
+
+    const overlay = document.createElement("div");
+    overlay.id = "gofleet-gmh-error-overlay";
+    Object.assign(overlay.style, {
+      position: "fixed",
+      top: "0",
+      left: "0",
+      width: "100vw",
+      height: "100vh",
+      backgroundColor: "rgba(15, 23, 42, 0.8)",
+      backdropFilter: "blur(4px)",
+      display: "flex",
+      alignItems: "center",
+      justifyContent: "center",
+      zIndex: "999999",
+      fontFamily: "-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif",
+      animation: "gofleetGmhFadeIn 0.2s ease-out"
+    });
+
+    const modal = document.createElement("div");
+    Object.assign(modal.style, {
+      backgroundColor: "#ffffff",
+      borderRadius: "16px",
+      padding: "28px 32px",
+      maxWidth: "480px",
+      width: "90%",
+      boxShadow: "0 25px 50px -12px rgba(0, 0, 0, 0.4)",
+      textAlign: "center",
+      border: "2px solid #ef4444",
+      animation: "gofleetGmhScaleIn 0.2s ease-out"
+    });
+
+    const iconDiv = document.createElement("div");
+    iconDiv.textContent = "🚫";
+    Object.assign(iconDiv.style, {
+      width: "60px",
+      height: "60px",
+      borderRadius: "50%",
+      backgroundColor: "#fee2e2",
+      color: "#dc2626",
+      fontSize: "30px",
+      display: "flex",
+      alignItems: "center",
+      justifyContent: "center",
+      margin: "0 auto 16px auto",
+      boxShadow: "0 4px 12px rgba(239, 68, 68, 0.25)"
+    });
+
+    const title = document.createElement("h3");
+    title.textContent = "Colis Non Autorisé (Non GMH)";
+    Object.assign(title.style, {
+      color: "#991b1b",
+      fontSize: "20px",
+      fontWeight: "700",
+      margin: "0 0 12px 0"
+    });
+
+    const codeBox = document.createElement("div");
+    codeBox.textContent = code;
+    Object.assign(codeBox.style, {
+      display: "inline-block",
+      backgroundColor: "#fef2f2",
+      border: "1px dashed #f87171",
+      color: "#b91c1c",
+      padding: "8px 16px",
+      borderRadius: "8px",
+      fontSize: "17px",
+      fontWeight: "700",
+      letterSpacing: "1px",
+      fontFamily: "monospace",
+      margin: "0 0 14px 0",
+      wordBreak: "break-all"
+    });
+
+    const desc = document.createElement("p");
+    desc.innerHTML = `Ce colis ne commence pas par <strong>GMH</strong>. Seuls les colis <strong>GMH</strong> sont autorisés au scan sur cette page.<br/><br/><span style="color:#059669;font-weight:600;font-size:13px;">ℹ️ Note : Les retours restent autorisés au scan normalement.</span>`;
+    Object.assign(desc.style, {
+      color: "#4b5563",
+      fontSize: "14px",
+      lineHeight: "1.5",
+      margin: "0 0 24px 0"
+    });
+
+    const closeBtn = document.createElement("button");
+    closeBtn.type = "button";
+    closeBtn.textContent = "OK, Compris";
+    Object.assign(closeBtn.style, {
+      backgroundColor: "#dc2626",
+      color: "#ffffff",
+      border: "none",
+      padding: "11px 28px",
+      borderRadius: "8px",
+      fontSize: "15px",
+      fontWeight: "600",
+      cursor: "pointer",
+      boxShadow: "0 4px 12px rgba(220, 38, 38, 0.3)",
+      outline: "none",
+      transition: "background-color 0.2s"
+    });
+
+    closeBtn.onmouseover = () => { closeBtn.style.backgroundColor = "#b91c1c"; };
+    closeBtn.onmouseout = () => { closeBtn.style.backgroundColor = "#dc2626"; };
+
+    function closeModal() {
+      window.removeEventListener("keydown", handleModalKeydown, true);
+      overlay.remove();
+      const input = findScanInput();
+      if (input) {
+        input.value = "";
+        setTimeout(() => {
+          try { input.focus(); } catch (e) {}
+        }, 50);
+      }
+    }
+
+    function handleModalKeydown(e) {
+      if (e.key === "Enter" || e.key === "Escape" || e.key === " " || e.keyCode === 13 || e.keyCode === 27) {
+        e.preventDefault();
+        e.stopPropagation();
+        e.stopImmediatePropagation();
+        closeModal();
+      }
+    }
+
+    closeBtn.addEventListener("click", (e) => {
+      e.preventDefault();
+      e.stopPropagation();
+      closeModal();
+    });
+
+    window.addEventListener("keydown", handleModalKeydown, true);
+
+    modal.appendChild(iconDiv);
+    modal.appendChild(title);
+    modal.appendChild(codeBox);
+    modal.appendChild(desc);
+    modal.appendChild(closeBtn);
+    overlay.appendChild(modal);
+    document.body.appendChild(overlay);
+
+    setTimeout(() => {
+      try { closeBtn.focus(); } catch (e) {}
+    }, 50);
+  }
+
+  // Intercept scan attempts on GMH pages
+  function interceptGmhScan(e, inputEl) {
+    if (!isGmhFilterPage()) return;
+    if (!inputEl) inputEl = findScanInput();
+    if (!inputEl) return;
+
+    const rawVal = inputEl.value || "";
+    const cleanVal = cleanScanValue(rawVal);
+    if (!cleanVal) return;
+
+    if (isNonGmhParcel(cleanVal)) {
+      // STOP SCAN COMPLETELY
+      e.preventDefault();
+      e.stopPropagation();
+      e.stopImmediatePropagation();
+
+      inputEl.value = "";
+      showGmhErrorModal(cleanVal);
+      return false;
+    }
+  }
+
+  // 1. CAPTURING KEYDOWN
+  document.addEventListener(
+    "keydown",
+    (e) => {
+      if (!isGmhFilterPage()) return;
+      if (e.key !== "Enter" && e.keyCode !== 13) return;
+
+      const target = e.target;
+      if (!target || target.tagName !== "INPUT") return;
+      if (target.type === "hidden" || target.readOnly || target.disabled) return;
+      if (target.name === "dateFilter" || target.id === "dateFilter") return;
+
+      interceptGmhScan(e, target);
+    },
+    true
+  );
+
+  // 2. CAPTURING KEYPRESS
+  document.addEventListener(
+    "keypress",
+    (e) => {
+      if (!isGmhFilterPage()) return;
+      if (e.key !== "Enter" && e.keyCode !== 13) return;
+
+      const target = e.target;
+      if (!target || target.tagName !== "INPUT") return;
+      if (target.type === "hidden" || target.readOnly || target.disabled) return;
+      if (target.name === "dateFilter" || target.id === "dateFilter") return;
+
+      const cleanVal = cleanScanValue(target.value);
+      if (cleanVal && isNonGmhParcel(cleanVal)) {
+        e.preventDefault();
+        e.stopPropagation();
+        e.stopImmediatePropagation();
+        return false;
+      }
+    },
+    true
+  );
+
+  // 3. CAPTURING FORM SUBMIT
+  document.addEventListener(
+    "submit",
+    (e) => {
+      if (!isGmhFilterPage()) return;
+      const form = e.target;
+      if (!form || form.tagName !== "FORM") return;
+
+      const input = form.querySelector("input#js-barcode-input, input[type='text'], input:not([type])");
+      if (input) {
+        interceptGmhScan(e, input);
+      }
+    },
+    true
+  );
+
+  // 4. CAPTURING BUTTON CLICK
+  document.addEventListener(
+    "click",
+    (e) => {
+      if (!isGmhFilterPage()) return;
+      const btn = e.target.closest("button, input[type='submit'], .btn, a.btn");
+      if (!btn) return;
+
+      const scanInput = findScanInput();
+      if (!scanInput) return;
+      if (btn.contains(scanInput)) return;
+
+      const cleanVal = cleanScanValue(scanInput.value);
+      if (cleanVal && isNonGmhParcel(cleanVal)) {
+        const btnText = (btn.textContent || "").toLowerCase();
+        if (
+          btn.type === "submit" ||
+          btn.closest("form") === scanInput.closest("form") ||
+          btnText.includes("scan") ||
+          btnText.includes("valid") ||
+          btnText.includes("cherch") ||
+          btnText.includes("ajouter")
+        ) {
+          e.preventDefault();
+          e.stopPropagation();
+          e.stopImmediatePropagation();
+          scanInput.value = "";
+          showGmhErrorModal(cleanVal);
+          return false;
+        }
+      }
+    },
+    true
+  );
+
+  // 5. Visual Security Badge
+  function updateGmhSecurityBadge() {
+    if (!isGmhFilterPage()) return;
+    const input = findScanInput();
+    if (!input) return;
+
+    let badge = document.getElementById("gofleet-gmh-security-badge");
+    if (!badge) {
+      badge = document.createElement("div");
+      badge.id = "gofleet-gmh-security-badge";
+      Object.assign(badge.style, {
+        display: "inline-flex",
+        alignItems: "center",
+        gap: "6px",
+        fontSize: "12px",
+        fontWeight: "600",
+        color: "#1e40af",
+        backgroundColor: "#dbeafe",
+        border: "1px solid #bfdbfe",
+        padding: "4px 10px",
+        borderRadius: "20px",
+        margin: "6px 0",
+        width: "fit-content",
+        transition: "all 0.3s ease"
+      });
+
+      const parent = input.parentElement;
+      if (parent) {
+        parent.insertBefore(badge, input);
+      }
+    }
+
+    badge.innerHTML = `🛡️ <strong>Scan Filtré :</strong> Colis GMH & Retours uniquement`;
+  }
+
+  if (document.body && document.body instanceof Node) {
+    const observer = new MutationObserver(() => {
+      if (isGmhFilterPage()) {
+        updateGmhSecurityBadge();
+      }
+    });
+    observer.observe(document.body, { childList: true, subtree: true });
+  }
+
+  setTimeout(updateGmhSecurityBadge, 500);
+  setTimeout(updateGmhSecurityBadge, 1500);
+  setTimeout(updateGmhSecurityBadge, 3000);
+})();
+
+// =========================================================================
+// --- End Affectation / Palette GMH Scan Validation Module ---
+// =========================================================================
+
+
 
 // --- Replace Website Scanner Button with Native App Button (In-Place Substitution) ---
 (function() {

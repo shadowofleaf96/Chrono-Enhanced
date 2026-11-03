@@ -749,32 +749,58 @@
     };
   }
 
+  function getActiveReconciliationTab() {
+    // 1. Ant Design tab headers check
+    const tabElements = Array.from(document.querySelectorAll('.ant-tabs-tab, [role="tab"]'));
+    for (const tab of tabElements) {
+      const isActive = tab.classList.contains('ant-tabs-tab-active') ||
+                       tab.getAttribute('aria-selected') === 'true' ||
+                       tab.classList.contains('active');
+      if (isActive) {
+        const text = tab.textContent.toLowerCase();
+        if (text.includes('consignment') || text.includes('colis') || text.includes('envoi')) {
+          return 'consignment';
+        }
+        if (text.includes('cash') && !text.includes('non-cash') && !text.includes('consignment')) {
+          return 'cash';
+        }
+        if (text.includes('non-cash') || text.includes('non cash')) {
+          return 'non-cash';
+        }
+      }
+    }
+
+    // 2. Visible tabpane check in DOM
+    const tabPanes = Array.from(document.querySelectorAll('.ant-tabs-tabpane, [role="tabpanel"]'));
+    for (const pane of tabPanes) {
+      const isHidden = pane.classList.contains('ant-tabs-tabpane-hidden') ||
+                       pane.getAttribute('aria-hidden') === 'true' ||
+                       pane.offsetParent === null;
+      if (!isHidden) {
+        const text = pane.textContent.toLowerCase();
+        if (text.includes('cns scanned') || text.includes('scan waybills') || pane.querySelector('input[placeholder*="Waybill" i]')) {
+          return 'consignment';
+        }
+        if (text.includes('cash balance') || text.includes('denomination')) {
+          return 'cash';
+        }
+      }
+    }
+
+    // 3. Directly visible Scan Waybills input check
+    const waybillInput = document.querySelector('input[placeholder*="Scan Waybill" i], input[placeholder*="Waybill" i]');
+    if (waybillInput && waybillInput.offsetParent !== null) {
+      const rect = waybillInput.getBoundingClientRect();
+      if (rect.width > 0 && rect.height > 0) {
+        return 'consignment';
+      }
+    }
+
+    return null;
+  }
+
   function isConsignmentTabActive() {
-    // 1. Direct check: input for scanning waybills present on Consignment Balance tab
-    const waybillInput = document.querySelector('input[placeholder*="Waybill" i], input[placeholder*="Scan Waybill" i], input[placeholder*="Scan" i]');
-    if (waybillInput && (waybillInput.offsetParent !== null || window.getComputedStyle(waybillInput).display !== 'none')) {
-      return true;
-    }
-
-    // 2. Active tab check in Ant Tabs
-    const activeTab = document.querySelector('.ant-tabs-tab-active, [role="tab"][aria-selected="true"], [class*="tab-active"], [class*="tabActive"]');
-    if (activeTab) {
-      const text = activeTab.textContent.toLowerCase();
-      if (text.includes('consignment') || text.includes('colis') || text.includes('envoi')) {
-        return true;
-      }
-      if (text.includes('cash') || text.includes('espèce') || text.includes('espece')) {
-        return false;
-      }
-    }
-
-    // 3. Fallback: check for table headers or indicators on Consignment Balance tab
-    const pageText = document.body.innerText || "";
-    if (pageText.includes('Scan Waybills') || pageText.includes('CNS Scanned') || pageText.includes('Undelivered And Picked Up Consignments')) {
-      return true;
-    }
-
-    return false;
+    return getActiveReconciliationTab() === 'consignment';
   }
 
   function ensureInscanButton() {
@@ -787,45 +813,69 @@
       if (!tab.dataset.chronoInscanTabListener) {
         tab.dataset.chronoInscanTabListener = 'true';
         tab.addEventListener('click', () => {
-          setTimeout(ensureInscanButton, 50);
+          setTimeout(ensureInscanButton, 30);
+          setTimeout(ensureInscanButton, 100);
           setTimeout(ensureInscanButton, 300);
+          setTimeout(ensureInscanButton, 600);
         });
       }
     });
 
-    // If NOT on the Consignment Balance tab (e.g. Cash Balance or Non-Cash Balance), remove button
+    // STRICT: If NOT on the Consignment Balance tab (e.g. Cash Balance or Non-Cash Balance), remove button immediately
     if (!isConsignmentTabActive()) {
       document.querySelectorAll('.chrono-inscan-ext-btn').forEach(btn => btn.remove());
       return;
     }
 
-    const allButtons = Array.from(document.querySelectorAll('button, .ant-btn, [role="button"]'));
-    // Only search among visible buttons (in active tab pane)
-    const visibleButtons = allButtons.filter(b => b.offsetParent !== null || window.getComputedStyle(b).display !== 'none');
+    // Locate the active Consignment tab pane or row
+    const activePane = Array.from(document.querySelectorAll('.ant-tabs-tabpane, [role="tabpanel"]')).find(pane => {
+      const isHidden = pane.classList.contains('ant-tabs-tabpane-hidden') ||
+                       pane.getAttribute('aria-hidden') === 'true' ||
+                       pane.offsetParent === null;
+      if (isHidden) return false;
+      return pane.textContent.includes('CNS Scanned') ||
+             pane.textContent.includes('Scan Waybills') ||
+             pane.querySelector('input[placeholder*="Waybill" i]') !== null;
+    });
 
-    const reconcileBtn = visibleButtons.find(b => {
-      const text = b.textContent.trim().toLowerCase();
-      return text === 'reconcile' || text === 'settle' || text === 'réconcilier' || text === 'reconcilier' || text === 'régler' || text === 'regler' || text === 'settlement' || text.includes('reconcil');
-    });
-    const cancelBtn = visibleButtons.find(b => {
-      const text = b.textContent.trim().toLowerCase();
-      return text === 'cancel' || text === 'annuler';
-    });
-    const reloadBtn = visibleButtons.find(b => b.querySelector('.anticon-reload'));
-    
-    if (reloadBtn && !reloadBtn.dataset.chronoToastAttached) {
-      reloadBtn.dataset.chronoToastAttached = 'true';
-      reloadBtn.addEventListener('click', () => {
-        toastShownForUrl = null;
+    const waybillInput = document.querySelector('input[placeholder*="Scan Waybill" i], input[placeholder*="Waybill" i]');
+
+    // Find the target Cancel / Reconcile button strictly within the active consignment pane/row
+    let targetAnchorBtn = null;
+
+    if (activePane) {
+      const paneButtons = Array.from(activePane.querySelectorAll('button, .ant-btn, [role="button"]'))
+        .filter(b => b.offsetParent !== null);
+      targetAnchorBtn = paneButtons.find(b => {
+        const text = b.textContent.trim().toLowerCase();
+        return text === 'cancel' || text === 'annuler';
+      }) || paneButtons.find(b => {
+        const text = b.textContent.trim().toLowerCase();
+        return text === 'reconcile' || text === 'settle' || text.includes('reconcil');
       });
     }
-    
-    const targetAnchorBtn = cancelBtn || reconcileBtn;
+
+    if (!targetAnchorBtn && waybillInput && waybillInput.offsetParent !== null) {
+      const scanRow = waybillInput.closest('.row, .ant-row, .d-flex, form') || waybillInput.parentElement?.parentElement;
+      if (scanRow) {
+        const rowButtons = Array.from(scanRow.querySelectorAll('button, .ant-btn, [role="button"]'))
+          .filter(b => b.offsetParent !== null);
+        targetAnchorBtn = rowButtons.find(b => {
+          const text = b.textContent.trim().toLowerCase();
+          return text === 'cancel' || text === 'annuler' || text === 'reconcile' || text.includes('reconcil');
+        });
+      }
+    }
+
     if (targetAnchorBtn && targetAnchorBtn.parentElement) {
       const container = targetAnchorBtn.parentElement;
-      if (container.querySelector('.chrono-inscan-ext-btn')) return;
+      
+      // If already positioned right before targetAnchorBtn, we are good
+      if (targetAnchorBtn.previousElementSibling && targetAnchorBtn.previousElementSibling.classList.contains('chrono-inscan-ext-btn')) {
+        return;
+      }
 
-      // Remove any stray buttons in other inactive containers
+      // Remove any duplicate or stray buttons elsewhere
       document.querySelectorAll('.chrono-inscan-ext-btn').forEach(btn => btn.remove());
 
       const inscanBtn = document.createElement('button');
