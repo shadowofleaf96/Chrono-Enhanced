@@ -749,6 +749,111 @@
     };
   }
 
+  function isConsignmentTabActive() {
+    // 1. Direct check: input for scanning waybills present on Consignment Balance tab
+    const waybillInput = document.querySelector('input[placeholder*="Waybill" i], input[placeholder*="Scan Waybill" i], input[placeholder*="Scan" i]');
+    if (waybillInput && (waybillInput.offsetParent !== null || window.getComputedStyle(waybillInput).display !== 'none')) {
+      return true;
+    }
+
+    // 2. Active tab check in Ant Tabs
+    const activeTab = document.querySelector('.ant-tabs-tab-active, [role="tab"][aria-selected="true"], [class*="tab-active"], [class*="tabActive"]');
+    if (activeTab) {
+      const text = activeTab.textContent.toLowerCase();
+      if (text.includes('consignment') || text.includes('colis') || text.includes('envoi')) {
+        return true;
+      }
+      if (text.includes('cash') || text.includes('espèce') || text.includes('espece')) {
+        return false;
+      }
+    }
+
+    // 3. Fallback: check for table headers or indicators on Consignment Balance tab
+    const pageText = document.body.innerText || "";
+    if (pageText.includes('Scan Waybills') || pageText.includes('CNS Scanned') || pageText.includes('Undelivered And Picked Up Consignments')) {
+      return true;
+    }
+
+    return false;
+  }
+
+  function ensureInscanButton() {
+    if (!location.pathname.includes("/ops/reconciliation")) return;
+    if (location.pathname.includes("/ops/reconciliation/rider-list")) return;
+
+    // Attach click listeners to tabs so tab switches instantly trigger update
+    const tabHeaders = document.querySelectorAll('.ant-tabs-tab, [role="tab"]');
+    tabHeaders.forEach(tab => {
+      if (!tab.dataset.chronoInscanTabListener) {
+        tab.dataset.chronoInscanTabListener = 'true';
+        tab.addEventListener('click', () => {
+          setTimeout(ensureInscanButton, 50);
+          setTimeout(ensureInscanButton, 300);
+        });
+      }
+    });
+
+    // If NOT on the Consignment Balance tab (e.g. Cash Balance or Non-Cash Balance), remove button
+    if (!isConsignmentTabActive()) {
+      document.querySelectorAll('.chrono-inscan-ext-btn').forEach(btn => btn.remove());
+      return;
+    }
+
+    const allButtons = Array.from(document.querySelectorAll('button, .ant-btn, [role="button"]'));
+    // Only search among visible buttons (in active tab pane)
+    const visibleButtons = allButtons.filter(b => b.offsetParent !== null || window.getComputedStyle(b).display !== 'none');
+
+    const reconcileBtn = visibleButtons.find(b => {
+      const text = b.textContent.trim().toLowerCase();
+      return text === 'reconcile' || text === 'settle' || text === 'réconcilier' || text === 'reconcilier' || text === 'régler' || text === 'regler' || text === 'settlement' || text.includes('reconcil');
+    });
+    const cancelBtn = visibleButtons.find(b => {
+      const text = b.textContent.trim().toLowerCase();
+      return text === 'cancel' || text === 'annuler';
+    });
+    const reloadBtn = visibleButtons.find(b => b.querySelector('.anticon-reload'));
+    
+    if (reloadBtn && !reloadBtn.dataset.chronoToastAttached) {
+      reloadBtn.dataset.chronoToastAttached = 'true';
+      reloadBtn.addEventListener('click', () => {
+        toastShownForUrl = null;
+      });
+    }
+    
+    const targetAnchorBtn = cancelBtn || reconcileBtn;
+    if (targetAnchorBtn && targetAnchorBtn.parentElement) {
+      const container = targetAnchorBtn.parentElement;
+      if (container.querySelector('.chrono-inscan-ext-btn')) return;
+
+      // Remove any stray buttons in other inactive containers
+      document.querySelectorAll('.chrono-inscan-ext-btn').forEach(btn => btn.remove());
+
+      const inscanBtn = document.createElement('button');
+      inscanBtn.type = "button";
+      inscanBtn.className = "ant-btn ant-btn-primary chrono-inscan-ext-btn";
+      inscanBtn.style.background = "#1890ff";
+      inscanBtn.style.borderColor = "#1890ff";
+      inscanBtn.style.color = "#ffffff";
+      inscanBtn.style.fontWeight = "bold";
+      inscanBtn.style.marginRight = "8px";
+      inscanBtn.innerHTML = `<span>📥 Inscan at Hub</span>`;
+      
+      container.insertBefore(inscanBtn, targetAnchorBtn);
+      
+      inscanBtn.addEventListener('click', (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        
+        const overlay = document.querySelector('.chrono-iframe-overlay');
+        if (overlay) {
+          showInscanOverlay();
+        } else {
+          preloadInscanModal(true);
+        }
+      });
+    }
+  }
+
   // ── Verify Completed Trips (Rider List) ─────────────────────
 
   function ensureVerifyCompletedButton() {
@@ -1750,6 +1855,7 @@
   // Watch for modal open/close on body
   const bodyObserver = new MutationObserver(() => {
     checkReconciliationToast();
+    ensureInscanButton();
     ensureVerifyCompletedButton();
     ensureDefaultFilters();
     ensureSalaryExportButton();
@@ -1772,6 +1878,7 @@
   // Fallback poll (SPA route changes may not trigger body mutations)
   setInterval(() => {
     checkReconciliationToast();
+    ensureInscanButton();
     ensureVerifyCompletedButton();
     ensureDefaultFilters();
     ensureSalaryExportButton();
