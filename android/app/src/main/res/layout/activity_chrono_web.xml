@@ -1,0 +1,195 @@
+<?xml version="1.0" encoding="utf-8"?>
+<androidx.coordinatorlayout.widget.CoordinatorLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    xmlns:tools="http://schemas.android.com/tools"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:background="@color/bg_screen">
+
+    <com.google.android.material.appbar.AppBarLayout
+        android:id="@+id/app_bar_layout"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        app:elevation="4dp">
+
+        <com.google.android.material.appbar.MaterialToolbar
+            android:id="@+id/toolbar_chrono"
+            android:layout_width="match_parent"
+            android:layout_height="48dp"
+            android:background="@color/chrono_primary"
+            app:contentInsetStartWithNavigation="0dp"
+            app:navigationIcon="@drawable/ic_portal_switch"
+            app:navigationIconTint="@color/chrono_on_primary"
+            app:title="Chrono Diali"
+            app:titleTextAppearance="@style/TextAppearance.Chrono.ToolbarTitle"
+            app:titleTextColor="@color/chrono_on_primary" />
+
+        <!-- In-Page Search Bar -->
+        <LinearLayout
+            android:id="@+id/layout_search_bar"
+            android:layout_width="match_parent"
+            android:layout_height="52dp"
+            android:background="#FFFFFF"
+            android:elevation="4dp"
+            android:gravity="center_vertical"
+            android:orientation="horizontal"
+            android:paddingStart="12dp"
+            android:paddingEnd="8dp"
+            android:visibility="gone">
+
+            <ImageView
+                android:layout_width="20dp"
+                android:layout_height="20dp"
+                android:contentDescription="Rechercher"
+                android:src="@drawable/ic_search"
+                app:tint="@color/chrono_primary" />
+
+            <EditText
+                android:id="@+id/edit_search_query"
+                android:layout_width="0dp"
+                android:layout_height="match_parent"
+                android:layout_marginStart="8dp"
+                android:layout_marginEnd="4dp"
+                android:layout_weight="1"
+                android:background="@null"
+                android:hint="Rechercher dans la page..."
+                android:imeOptions="actionSearch"
+                android:inputType="textNoSuggestions|text"
+                android:maxLines="1"
+                android:textColor="@color/text_primary"
+                android:textColorHint="@color/text_secondary"
+                android:textSize="14sp" />
+
+            <TextView
+                android:id="@+id/text_search_count"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginEnd="4dp"
+                android:fontFamily="sans-serif-medium"
+                android:textColor="@color/text_secondary"
+                android:textSize="12sp"
+                tools:text="1/5" />
+
+            <ImageButton
+                android:id="@+id/btn_search_prev"
+                android:layout_width="36dp"
+                android:layout_height="36dp"
+                android:background="?attr/selectableItemBackgroundBorderless"
+                android:contentDescription="Précédent"
+                android:src="@drawable/ic_arrow_up"
+                app:tint="@color/chrono_primary" />
+
+            <ImageButton
+                android:id="@+id/btn_search_next"
+                android:layout_width="36dp"
+                android:layout_height="36dp"
+                android:background="?attr/selectableItemBackgroundBorderless"
+                android:contentDescription="Suivant"
+                android:src="@drawable/ic_arrow_down"
+                app:tint="@color/chrono_primary" />
+
+            <ImageButton
+                android:id="@+id/btn_close_search"
+                android:layout_width="36dp"
+                android:layout_height="36dp"
+                android:background="?attr/selectableItemBackgroundBorderless"
+                android:contentDescription="Fermer la recherche"
+                android:src="@drawable/ic_close"
+                app:tint="@color/text_secondary" />
+
+        </LinearLayout>
+
+        <com.google.android.material.progressindicator.LinearProgressIndicator
+            android:id="@+id/progress_loading"
+            android:layout_width="match_parent"
+            android:layout_height="4dp"
+            android:indeterminate="true"
+            android:visibility="gone"
+            app:indicatorColor="@color/chrono_primary_light"
+            app:trackColor="@color/chrono_primary_dark" />
+
+    </com.google.android.material.appbar.AppBarLayout>
+
+    <FrameLayout
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        app:layout_behavior="@string/appbar_scrolling_view_behavior">
+
+        <WebView
+            android:id="@+id/webview_chrono"
+            android:layout_width="match_parent"
+            android:layout_height="match_parent"
+            android:scrollbars="vertical" />
+
+        <!-- Error / Retry Container -->
+        <LinearLayout
+            android:id="@+id/layout_error"
+            android:layout_width="match_parent"
+            android:layout_height="match_parent"
+            android:background="@color/bg_screen"
+            android:gravity="center"
+            android:orientation="vertical"
+            android:padding="24dp"
+            android:visibility="gone">
+
+            <ImageView
+                android:layout_width="64dp"
+                android:layout_height="64dp"
+                android:contentDescription="Erreur"
+                android:src="@drawable/ic_error_outline"
+                app:tint="@color/status_undelivered" />
+
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="16dp"
+                android:fontFamily="sans-serif-bold"
+                android:text="Impossible de charger Chrono Diali"
+                android:textColor="@color/text_primary"
+                android:textSize="18sp" />
+
+            <TextView
+                android:id="@+id/tv_error_details"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="8dp"
+                android:gravity="center"
+                android:text="Vérifiez votre connexion Internet ou l'accès au réseau Chrono."
+                android:textColor="@color/text_secondary"
+                android:textSize="13sp" />
+
+            <com.google.android.material.button.MaterialButton
+                android:id="@+id/btn_retry"
+                android:layout_width="wrap_content"
+                android:layout_height="48dp"
+                android:layout_marginTop="20dp"
+                android:backgroundTint="@color/chrono_primary"
+                android:fontFamily="sans-serif-bold"
+                android:text="Réessayer"
+                android:textColor="@color/chrono_on_primary"
+                app:cornerRadius="10dp"
+                app:icon="@drawable/ic_refresh"
+                app:iconTint="@color/chrono_on_primary" />
+
+        </LinearLayout>
+
+    </FrameLayout>
+
+    <!-- FAB Scanner (shown on ops pages) -->
+    <com.google.android.material.floatingactionbutton.ExtendedFloatingActionButton
+        android:id="@+id/fab_scan_barcode"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_gravity="bottom|end"
+        android:layout_margin="16dp"
+        android:backgroundTint="@color/chrono_primary"
+        android:fontFamily="sans-serif-bold"
+        android:text="Scanner"
+        android:textColor="#FFFFFF"
+        android:visibility="gone"
+        app:elevation="6dp"
+        app:icon="@drawable/ic_scan_barcode"
+        app:iconTint="#FFFFFF"
+        app:rippleColor="#40FFFFFF" />
+
+</androidx.coordinatorlayout.widget.CoordinatorLayout>

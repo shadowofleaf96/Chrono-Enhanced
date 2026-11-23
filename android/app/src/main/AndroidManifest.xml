@@ -17,6 +17,8 @@
         android:supportsRtl="true"
         android:theme="@style/Theme.ChronoMohammedia"
         android:usesCleartextTraffic="true">
+
+        <!-- Entry point: portal selector screen -->
         <activity
             android:name=".ui.portal.PortalSelectorActivity"
             android:exported="true">
@@ -26,33 +28,25 @@
             </intent-filter>
         </activity>
 
+        <!-- Chrono Diali: WebView (replaces all native Kotlin screens) -->
         <activity
-            android:name=".ui.login.LoginActivity"
+            android:name=".ui.chrono.ChronoWebActivity"
             android:exported="false"
             android:windowSoftInputMode="adjustResize" />
 
+        <!-- Marjane Mall TMS: WebView (unchanged) -->
         <activity
             android:name=".ui.marjane.MarjaneMallActivity"
             android:exported="false"
             android:windowSoftInputMode="adjustResize" />
 
-        <activity
-            android:name=".ui.MainActivity"
-            android:exported="false"
-            android:windowSoftInputMode="adjustResize" />
-
+        <!-- Barcode Scanner (shared by both portals) -->
         <activity
             android:name=".ui.scanner.ScannerActivity"
             android:exported="false"
             android:screenOrientation="portrait"
             android:theme="@style/Theme.ChronoMohammedia" />
 
-        <activity
-            android:name=".ui.riders.RiderReconciliationActivity"
-            android:exported="false"
-            android:screenOrientation="portrait"
-            android:theme="@style/Theme.ChronoMohammedia"
-            android:windowSoftInputMode="adjustResize" />
     </application>
 
 </manifest>

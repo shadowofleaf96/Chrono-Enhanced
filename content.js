@@ -47,6 +47,14 @@
     }
   });
 
+  function getCurrentHubId() {
+    try {
+      const stored = JSON.parse(localStorage.getItem('__CURRENT_HUB__') || '{}');
+      if (stored && stored.id) return String(stored.id);
+    } catch (_) {}
+    return "2477050730750414061";
+  }
+
   // ── Status cache (CN → array of {status, color, time}) ────
   const statusCache = new Map();
   const LOG_ENTRIES_COUNT = 3;          // how many recent logs to show
@@ -297,17 +305,27 @@
   function getScanModal(doc = document) {
     const modals = doc.querySelectorAll(".ant-modal-content");
     for (const modal of modals) {
-      // Look for modals with a CN scan input and a table
-      const scanInput = modal.querySelector('input[placeholder*="CN"], input[placeholder*="Add consignments"]');
-      const table = modal.querySelector(".ant-table");
-      if (scanInput && table) return modal;
+      const titleEl = modal.querySelector(".ant-modal-title");
+      const t = titleEl ? titleEl.textContent.trim().toLowerCase() : "";
 
-      // Also match by title
-      const title = modal.querySelector(".ant-modal-title");
-      if (title) {
-        const t = title.textContent.trim().toLowerCase();
-        if (t.includes("scan") && table) return modal;
-      }
+      const isScanTitle = t.includes("scan") ||
+                          t.includes("inscan") ||
+                          t.includes("outscan") ||
+                          t.includes("arrival") ||
+                          t.includes("arriv") ||
+                          t.includes("manifest") ||
+                          t.includes("run") ||
+                          t.includes("bag") ||
+                          t.includes("dispatch");
+
+      const scanInput = modal.querySelector(
+        'input[placeholder*="CN" i], input[placeholder*="consign" i], input[placeholder*="Scan" i], input[placeholder*="AWB" i], input[placeholder*="Bag" i], input[placeholder*="Run" i], input[placeholder*="Manifest" i], input[placeholder*="Arriv" i], input[placeholder*="Envoi" i], input[placeholder*="Code" i]'
+      ) || modal.querySelector('.ant-input:not([type="hidden"]):not([type="checkbox"]):not([type="radio"])');
+
+      const hasTableOrList = modal.querySelector(".ant-table") || modal.querySelector(".ant-table-wrapper") || modal.querySelector("table") || modal.querySelector(".ant-empty");
+
+      if (isScanTitle && (scanInput || hasTableOrList)) return modal;
+      if (scanInput && hasTableOrList) return modal;
     }
     return null;
   }
@@ -322,8 +340,14 @@
     }
     if (el && !el.hasAttribute("data-chrono-widened")) {
       el.setAttribute("data-chrono-widened", "true");
-      el.style.width = "1150px";
-      el.style.maxWidth = "95vw";
+      if (window.innerWidth <= 768) {
+        el.style.width = "96vw";
+        el.style.maxWidth = "96vw";
+        el.style.margin = "8px auto";
+      } else {
+        el.style.width = "1150px";
+        el.style.maxWidth = "95vw";
+      }
     }
   }
 
@@ -336,7 +360,13 @@
   function ensureImportExcelButton(modal) {
     if (modal.querySelector('.chrono-ext-import-btn')) return;
 
-    const scanInput = modal.querySelector('input[placeholder*="CN"], input[placeholder*="Add consignments"]');
+    let scanInput = modal.querySelector(
+      'input[placeholder*="CN" i], input[placeholder*="consign" i], input[placeholder*="Scan" i], input[placeholder*="AWB" i], input[placeholder*="Bag" i], input[placeholder*="Run" i], input[placeholder*="Manifest" i], input[placeholder*="Arriv" i], input[placeholder*="Envoi" i], input[placeholder*="Code" i]'
+    );
+    if (!scanInput) {
+      const allInputs = Array.from(modal.querySelectorAll('input:not([type="hidden"]):not([type="checkbox"]):not([type="radio"]):not([type="date"])'));
+      scanInput = allInputs.find(inp => inp.offsetParent !== null) || allInputs[0];
+    }
     if (!scanInput) return;
 
     const fileInput = document.createElement('input');
@@ -345,52 +375,111 @@
     fileInput.style.display = 'none';
     
     const btn = document.createElement('button');
+    btn.type = 'button';
     btn.className = 'chrono-ext-import-btn';
     btn.textContent = 'Import Excel';
     
     btn.addEventListener('click', (e) => {
       e.preventDefault();
+      e.stopPropagation();
+      fileInput.value = '';
       fileInput.click();
     });
 
     fileInput.addEventListener('change', async (e) => {
-      const file = e.target.files[0];
+      const file = e.target.files && e.target.files[0];
       if (!file) return;
       
       const reader = new FileReader();
       reader.onload = async function(evt) {
         try {
-          const data = evt.target.result;
-          const workbook = XLSX.read(data, { type: 'binary' });
+          const buffer = evt.target.result;
+          const data = new Uint8Array(buffer);
+          const xlsxLib = typeof XLSX !== 'undefined' ? XLSX : (window.top?.XLSX || window.parent?.XLSX || (modal.ownerDocument && modal.ownerDocument.defaultView?.XLSX));
+          
+          if (!xlsxLib) {
+            console.error('[ChronoExt] XLSX library not found in window or parent');
+            alert('La bibliothèque Excel (XLSX) n\'est pas encore disponible. Veuillez patienter un instant ou réactualiser la page.');
+            return;
+          }
+
+          const workbook = xlsxLib.read(data, { type: 'array' });
           const firstSheetName = workbook.SheetNames[0];
           const worksheet = workbook.Sheets[firstSheetName];
-          const rows = XLSX.utils.sheet_to_json(worksheet, { header: 1 });
+          const rows = xlsxLib.utils.sheet_to_json(worksheet, { header: 1 });
           
+          if (!rows || rows.length === 0) {
+            alert('Le fichier Excel sélectionné est vide.');
+            return;
+          }
+
           const modalTitleEl = modal.querySelector('.ant-modal-title');
           const modalTitle = modalTitleEl ? modalTitleEl.textContent.toLowerCase() : '';
           const isOutscan = modalTitle.includes('outscan');
           
+          // Determine where data starts (detect banner vs standard table vs raw list)
+          let startRow = 0;
+          for (let r = 0; r < Math.min(5, rows.length); r++) {
+            const rowStr = (rows[r] || []).join(' ').toUpperCase();
+            if (rowStr.includes("ACCUSE") || rowStr.includes("FUTURAMA") || rowStr.includes("CHRONODIALI") || rowStr.includes("BORDEREAU")) {
+              startRow = 5; // Chrono/Futurama banner export, start at row 6
+              break;
+            }
+          }
+          if (startRow === 0 && rows.length > 1) {
+            const firstRowStr = (rows[0] || []).join(' ').toLowerCase();
+            if (firstRowStr.includes("cn") || firstRowStr.includes("tracking") || firstRowStr.includes("code") || 
+                firstRowStr.includes("awb") || firstRowStr.includes("envoi") || firstRowStr.includes("colis") || 
+                firstRowStr.includes("num") || firstRowStr.includes("ref")) {
+              startRow = 1; // Header row, start at row 2
+            }
+          }
+
           let codes = [];
-          // Start from row 6 (index 5)
-          for (let i = 5; i < rows.length; i++) {
-            let row = rows[i];
-            if (!row) continue;
+          const seen = new Set();
+
+          function addCandidate(val) {
+            if (val === null || val === undefined) return;
+            const str = String(val).trim();
+            if (str.length < 4) return;
+            const upper = str.toUpperCase();
+            if (upper.includes("ACCUSE") || upper.includes("FUTURAMA") || upper.includes("CHRONODIALI") || 
+                upper.includes("BORDEREAU") || upper.includes("TRACKING") || upper.includes("TOTAL") ||
+                upper.includes("DATE") || upper.includes("STATUT") || upper.includes("CLIENT")) {
+              return;
+            }
+            if (!seen.has(str)) {
+              seen.add(str);
+              codes.push(str);
+            }
+          }
+
+          for (let i = startRow; i < rows.length; i++) {
+            const row = rows[i];
+            if (!row || !Array.isArray(row)) continue;
             
-            // If Outscan, grab from all columns. Otherwise (Inscan, Set RTO, etc), grab only Column A (index 0)
-            const columnsToRead = isOutscan ? row.length : 1;
-            
-            for (let j = 0; j < columnsToRead; j++) {
-              let val = row[j];
-              if (val && typeof val === 'string') {
-                let trimmed = val.trim();
-                let upper = trimmed.toUpperCase();
-                
-                // Exclude specific strings and check length
-                if (trimmed.length > 5 && 
-                    !upper.includes("ACCUSE FUTURAMA EXPRESS") && 
-                    !upper.includes("ACCUSE CHRONODIALI")) {
-                  codes.push(trimmed);
+            if (isOutscan) {
+              // Outscan can have codes across multiple columns
+              for (let j = 0; j < row.length; j++) {
+                addCandidate(row[j]);
+              }
+            } else {
+              // Inscan / Arrival: primary column is column 0, or column 1 if column 0 was an index (e.g. 1, 2, 3)
+              let addedFromRow = false;
+              for (let j = 0; j < Math.min(row.length, 3); j++) {
+                const cell = row[j];
+                if (cell !== null && cell !== undefined) {
+                  const s = String(cell).trim();
+                  // Skip simple row index numbers like "1", "2"
+                  if (/^\d{1,3}$/.test(s)) continue;
+                  addCandidate(s);
+                  addedFromRow = true;
+                  break;
                 }
+              }
+              // If not added yet, check column 0 anyway
+              if (!addedFromRow && row[0] !== undefined) {
+                addCandidate(row[0]);
               }
             }
           }
@@ -413,42 +502,46 @@
               scanInput.dispatchEvent(new Event('input', { bubbles: true }));
               scanInput.dispatchEvent(new Event('change', { bubbles: true }));
               
-              const enterEvent = new KeyboardEvent('keydown', {
-                key: 'Enter',
-                code: 'Enter',
-                keyCode: 13,
-                which: 13,
-                bubbles: true,
-                cancelable: true
+              ['keydown', 'keypress', 'keyup'].forEach(eventType => {
+                scanInput.dispatchEvent(new KeyboardEvent(eventType, {
+                  key: 'Enter',
+                  code: 'Enter',
+                  keyCode: 13,
+                  which: 13,
+                  bubbles: true,
+                  cancelable: true
+                }));
               });
-              scanInput.dispatchEvent(enterEvent);
               
-              await new Promise(r => setTimeout(r, 400));
+              await new Promise(r => setTimeout(r, 450));
             }
             
             btn.textContent = originalText;
             btn.style.pointerEvents = 'auto';
             btn.style.opacity = '1';
           } else {
-            alert('No tracking codes found in row 6 or below.');
+            alert('Aucun code de suivi valide trouvé dans le fichier Excel.');
           }
         } catch (err) {
           console.error('[ChronoExt] Error parsing Excel', err);
-          alert('Error parsing Excel file. Please make sure it is a valid spreadsheet.');
+          alert('Erreur lors de la lecture du fichier Excel: ' + (err.message || 'Format non supporté'));
         }
         fileInput.value = '';
       };
-      reader.readAsBinaryString(file);
+      reader.readAsArrayBuffer(file);
     });
     
-    const wrapper = scanInput.closest('.ant-space-item') || scanInput.parentElement;
-    wrapper.appendChild(fileInput);
-    
-    // Add button directly after the input wrapper if possible, or append to parent
-    if (scanInput.closest('.ant-input-affix-wrapper')) {
-      const affix = scanInput.closest('.ant-input-affix-wrapper');
-      affix.parentNode.insertBefore(btn, affix.nextSibling);
+    const groupWrapper = scanInput.closest('.ant-input-group-wrapper') || 
+                         scanInput.closest('.ant-input-affix-wrapper') || 
+                         scanInput.closest('.ant-input-wrapper') || 
+                         scanInput.closest('.ant-space-item') || 
+                         scanInput.parentElement;
+    if (groupWrapper && groupWrapper.parentNode) {
+      groupWrapper.parentNode.insertBefore(fileInput, groupWrapper.nextSibling);
+      groupWrapper.parentNode.insertBefore(btn, fileInput.nextSibling);
     } else {
+      const wrapper = scanInput.closest('.ant-space-item') || scanInput.parentElement;
+      wrapper.appendChild(fileInput);
       wrapper.appendChild(btn);
     }
   }
@@ -593,10 +686,32 @@
       overlay.style.pointerEvents = 'none';
     }
     if (triggerReload) {
+      const wasConsignmentTab = typeof isConsignmentTabActive === 'function' && isConsignmentTabActive();
       setTimeout(() => {
-        const reloadBtn = document.querySelector('button .anticon-reload')?.closest('button');
+        // Find reload button within active tab pane to avoid unintentional tab switching
+        const activePane = Array.from(document.querySelectorAll('.ant-tabs-tabpane, [role="tabpanel"]')).find(pane => {
+          return !pane.classList.contains('ant-tabs-tabpane-hidden') && pane.getAttribute('aria-hidden') !== 'true';
+        });
+        const reloadBtn = activePane?.querySelector('button .anticon-reload')?.closest('button')
+          || document.querySelector('.chrono-reload-btn')
+          || document.querySelector('button .anticon-reload')?.closest('button');
         if (reloadBtn) {
           reloadBtn.click();
+          if (wasConsignmentTab) {
+            // Restore consignment tab as soon as Shipsy finishes re-rendering
+            let retries = 0;
+            const restoreInterval = setInterval(() => {
+              retries++;
+              const tabs = Array.from(document.querySelectorAll('.ant-tabs-tab, [role="tab"]'));
+              const consignmentTab = tabs.find(t => (t.innerText || '').toLowerCase().includes('consignment'));
+              if (consignmentTab && !consignmentTab.classList.contains('ant-tabs-tab-active')) {
+                consignmentTab.click();
+              }
+              if (retries >= 8 || (consignmentTab && consignmentTab.classList.contains('ant-tabs-tab-active'))) {
+                clearInterval(restoreInterval);
+              }
+            }, 400);
+          }
         }
       }, 300);
     }
@@ -607,12 +722,20 @@
     if (overlay) {
       overlay.style.opacity = '1';
       overlay.style.pointerEvents = 'auto';
+      const iframe = overlay.querySelector('#chrono-inscan-iframe');
       if (overlay.dataset.ready === 'true') {
         const loadingEl = overlay.querySelector('.chrono-iframe-loading');
         if (loadingEl) loadingEl.style.display = 'none';
-        const iframe = overlay.querySelector('#chrono-inscan-iframe');
         if (iframe) iframe.style.opacity = '1';
       }
+      try {
+        const idoc = iframe?.contentDocument;
+        if (idoc && !idoc.querySelector('.ant-modal-content')) {
+          // Modal was removed (e.g. user submitted OK); recreate clean overlay
+          overlay.remove();
+          preloadInscanModal(true);
+        }
+      } catch (e) {}
     }
   }
   
@@ -646,13 +769,139 @@
           return;
         }
         
-        // Hide standard layout elements so it feels like a modal
+        try {
+          if (doc.defaultView && !doc.defaultView.XLSX && (window.XLSX || window.top?.XLSX)) {
+            doc.defaultView.XLSX = window.XLSX || window.top?.XLSX;
+          }
+        } catch (e) {}
+        
+        // Hide standard layout elements and ensure clean mobile responsiveness
         const style = doc.createElement('style');
         style.id = "chrono-iframe-style";
         style.textContent = `
           header, .ant-layout-header, .ant-layout-sider, .top-bar, .ant-pro-sider { display: none !important; }
+          #root { display: none !important; }
           .ant-layout, .ant-layout-content { margin: 0 !important; padding: 0 !important; background: transparent !important; }
-          body { background: transparent !important; }
+          body { background: transparent !important; overflow: hidden !important; }
+          .ant-modal-mask { background: rgba(0, 0, 0, 0.55) !important; }
+          .ant-modal-wrap { 
+            position: fixed !important;
+            inset: 0 !important;
+            z-index: 1000 !important; 
+            overflow-y: auto !important; 
+            padding: 16px !important;
+            display: flex !important;
+            align-items: center !important;
+            justify-content: center !important;
+          }
+          .ant-modal { 
+            width: 1150px !important; 
+            max-width: 95vw !important; 
+            margin: auto !important; 
+            top: 20px !important;
+            padding-bottom: 0 !important;
+          }
+          .ant-modal-content { 
+            border-radius: 8px !important; 
+            max-height: 90vh !important; 
+            display: flex !important;
+            flex-direction: column !important;
+            overflow: hidden !important; 
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.25) !important;
+          }
+          .ant-modal-header {
+            padding: 14px 20px !important;
+            border-bottom: 1px solid #f0f0f0 !important;
+          }
+          .ant-modal-title {
+            font-size: 16px !important;
+            font-weight: 700 !important;
+            color: #1e293b !important;
+          }
+          .ant-modal-close {
+            top: 10px !important;
+            right: 12px !important;
+            width: 32px !important;
+            height: 32px !important;
+          }
+          .ant-modal-close-x {
+            width: 32px !important;
+            height: 32px !important;
+            line-height: 32px !important;
+            font-size: 16px !important;
+          }
+          .ant-modal-body { 
+            max-height: calc(90vh - 120px) !important; 
+            overflow-y: auto !important; 
+            padding: 16px 20px !important; 
+          }
+          .ant-modal-footer {
+            padding: 10px 20px !important;
+            border-top: 1px solid #f0f0f0 !important;
+            display: flex !important;
+            justify-content: flex-end !important;
+            gap: 8px !important;
+          }
+          .ant-modal-footer button {
+            min-height: 36px !important;
+            padding: 0 16px !important;
+            border-radius: 4px !important;
+            font-weight: 600 !important;
+          }
+          @media (max-width: 768px) {
+            .ant-modal-wrap {
+              padding: 10px !important;
+            }
+            .ant-modal {
+              width: 96vw !important;
+              max-width: 440px !important;
+              top: 0 !important;
+            }
+            .ant-modal-content {
+              border-radius: 14px !important;
+            }
+            .ant-modal-body {
+              padding: 12px !important;
+              max-height: calc(90vh - 130px) !important;
+            }
+            .ant-modal-footer button {
+              min-height: 40px !important;
+            }
+          }
+            font-size: 14px !important;
+          }
+
+          /* Scan input field styling */
+          input[placeholder*="Add consignments"],
+          input[placeholder*="consignments"] {
+            height: 44px !important;
+            font-size: 15px !important;
+            border-radius: 8px !important;
+            border: 1.5px solid #0088ce !important;
+          }
+
+          /* Import Excel button */
+          .chrono-ext-import-btn,
+          button.chrono-ext-import-btn {
+            margin-top: 8px !important;
+            margin-bottom: 8px !important;
+            height: 36px !important;
+            font-size: 13px !important;
+            border-radius: 6px !important;
+          }
+
+          /* Modal table styling */
+          .ant-table-wrapper { 
+            width: 100% !important; 
+            overflow-x: auto !important; 
+            margin-top: 8px !important;
+          }
+          .ant-table {
+            font-size: 13px !important;
+          }
+          .ant-table th, .ant-table td {
+            padding: 8px 6px !important;
+          }
         `;
         doc.head.appendChild(style);
         
@@ -670,6 +919,11 @@
             iframe.style.opacity = '1';
             overlay.dataset.ready = 'true';
             
+            try {
+              if (doc.defaultView && !doc.defaultView.XLSX && (window.XLSX || window.top?.XLSX)) {
+                doc.defaultView.XLSX = window.XLSX || window.top?.XLSX;
+              }
+            } catch (e) {}
 
             // Apply UI updates to the modal immediately
             tick(doc);
@@ -682,7 +936,7 @@
                 const closeBtn = e.target.closest('.ant-modal-close');
                 let isCancel = false;
                 const btn = e.target.closest('button');
-                if (btn && btn.textContent.trim() === 'Cancel' && btn.closest('.ant-modal-footer')) {
+                if (btn && btn.textContent.trim().toLowerCase() === 'cancel' && btn.closest('.ant-modal-footer')) {
                   isCancel = true;
                 }
                 const wrap = e.target.closest('.ant-modal-wrap');
@@ -693,6 +947,18 @@
                   e.stopPropagation();
                   e.stopImmediatePropagation();
                   hideInscanOverlay();
+                  return;
+                }
+
+                // If user clicks OK in modal footer, watch for completion to hide overlay and reload parent
+                let isOk = false;
+                if (btn && btn.textContent.trim().toLowerCase() === 'ok' && btn.closest('.ant-modal-footer')) {
+                  isOk = true;
+                }
+                if (isOk) {
+                  setTimeout(() => {
+                    hideInscanOverlay(true);
+                  }, 800);
                 }
               }, true); // capture phase to beat React
             }
@@ -904,6 +1170,150 @@
     }
   }
 
+  // ── Cash Balance: Check All Delivered & Settle Helper ────────
+
+  function checkAllDeliveredParcelsOnPage() {
+    // 1. Try clicking the header "Select All" checkbox first
+    const headerCb = document.querySelector('thead .ant-table-selection-column input[type="checkbox"], thead input[type="checkbox"]');
+    const headerWrap = document.querySelector('thead .ant-table-selection-column .ant-checkbox-wrapper, thead .ant-table-selection-column .ant-checkbox') || headerCb;
+    
+    if (headerCb && !headerCb.checked && headerWrap) {
+      headerWrap.click();
+    }
+
+    // 2. Click any remaining unchecked row checkboxes
+    setTimeout(() => {
+      const rows = document.querySelectorAll('tbody tr.ant-table-row, tbody tr');
+      rows.forEach(r => {
+        const cb = r.querySelector('.ant-table-selection-column input[type="checkbox"], .ant-checkbox-input, input[type="checkbox"]');
+        const wrap = r.querySelector('.ant-checkbox-wrapper, .ant-checkbox') || cb;
+        if (cb && !cb.checked && wrap) {
+          wrap.click();
+        }
+      });
+    }, 60);
+  }
+
+  function ensureCashBalanceSettleHelper() {
+    if (!location.pathname.includes("/ops/reconciliation/recon/")) return;
+
+    // Only apply on the Cash Balance tab
+    const currentTab = getActiveReconciliationTab();
+    if (currentTab !== 'cash') {
+      const existingBtn = document.getElementById('chrono-check-all-delivered-btn');
+      if (existingBtn) existingBtn.remove();
+      return;
+    }
+
+    // Attach click listeners to tabs so tab switches instantly trigger update
+    const tabHeaders = document.querySelectorAll('.ant-tabs-tab, [role="tab"]');
+    tabHeaders.forEach(tab => {
+      if (!tab.dataset.chronoCashTabListener) {
+        tab.dataset.chronoCashTabListener = 'true';
+        tab.addEventListener('click', () => {
+          setTimeout(ensureCashBalanceSettleHelper, 30);
+          setTimeout(ensureCashBalanceSettleHelper, 150);
+          setTimeout(ensureCashBalanceSettleHelper, 350);
+        });
+      }
+    });
+
+    // Extract Balance value from label, e.g. "Balance: 8610.80" or .Component-detailLabel-...
+    let balanceVal = 0.0;
+    const balanceElements = Array.from(document.querySelectorAll('[class*="detailLabel"], [class*="balanceHeader"], [class*="settleBalance"], span, div, p'));
+    for (const el of balanceElements) {
+      if (el.children.length > 0) continue;
+      const text = el.textContent || '';
+      const m = text.match(/Balance\s*:\s*([\d\.,]+)/i);
+      if (m) {
+        balanceVal = parseFloat(m[1].replace(/,/g, ''));
+        break;
+      }
+    }
+
+    // Read Settle Amount input
+    const settleInput = document.querySelector('input[placeholder="Settle Amount"], input.ant-input-number-input[placeholder*="Settle" i], input.ant-input-number-input[aria-valuenow]');
+    let currentSettleAmt = 0.0;
+    if (settleInput) {
+      const rawVal = settleInput.getAttribute('aria-valuenow') || settleInput.value || '0';
+      currentSettleAmt = parseFloat(rawVal.replace(/,/g, '')) || 0.0;
+    }
+
+    // Locate the Reconcile / Settle / Cancel buttons
+    const activePane = Array.from(document.querySelectorAll('.ant-tabs-tabpane, [role="tabpanel"]')).find(pane => {
+      const isHidden = pane.classList.contains('ant-tabs-tabpane-hidden') ||
+                       pane.getAttribute('aria-hidden') === 'true' ||
+                       pane.offsetParent === null;
+      if (isHidden) return false;
+      const t = pane.textContent.toLowerCase();
+      return t.includes('amount collected') || t.includes('payment mo') || t.includes('balance:');
+    });
+
+    const buttons = activePane
+      ? Array.from(activePane.querySelectorAll('button, .ant-btn, [role="button"]')).filter(b => b.offsetParent !== null)
+      : Array.from(document.querySelectorAll('button, .ant-btn, [role="button"]')).filter(b => b.offsetParent !== null);
+
+    const settleBtn = buttons.find(b => {
+      const t = b.textContent.trim().toLowerCase();
+      return t === 'settle' || t === 'reconcile' || t === 'réconcilier' || t === 'reconcilier' || t === 'régler' || t === 'regler' || t === 'settlement';
+    });
+    const cancelBtn = buttons.find(b => {
+      const t = b.textContent.trim().toLowerCase();
+      return t === 'cancel' || t === 'annuler';
+    });
+
+    const anchorBtn = cancelBtn || settleBtn;
+    if (!anchorBtn || !anchorBtn.parentElement) return;
+
+    const container = anchorBtn.parentElement;
+
+    // Check table rows and checkboxes
+    const rowCheckboxes = Array.from(document.querySelectorAll('tbody tr .ant-table-selection-column input[type="checkbox"], tbody tr .ant-checkbox-input, tbody tr input[type="checkbox"]'));
+    const uncheckedBoxes = rowCheckboxes.filter(cb => !cb.checked);
+    const totalRows = rowCheckboxes.length;
+
+    // Auto-check on first load if unchecked rows exist and balance > 0
+    if (totalRows > 0 && uncheckedBoxes.length > 0 && container.dataset.chronoAutoChecked !== location.pathname) {
+      container.dataset.chronoAutoChecked = location.pathname;
+      checkAllDeliveredParcelsOnPage();
+    }
+
+    // Create or update our "Tout Cocher pour Règlement" button
+    let checkAllBtn = document.getElementById('chrono-check-all-delivered-btn');
+    if (!checkAllBtn) {
+      checkAllBtn = document.createElement('button');
+      checkAllBtn.id = 'chrono-check-all-delivered-btn';
+      checkAllBtn.type = 'button';
+      checkAllBtn.className = 'ant-btn ant-btn-primary';
+      checkAllBtn.style.color = '#ffffff';
+      checkAllBtn.style.fontWeight = 'bold';
+      checkAllBtn.style.marginRight = '8px';
+      checkAllBtn.style.borderRadius = '4px';
+
+      container.insertBefore(checkAllBtn, anchorBtn);
+
+      checkAllBtn.addEventListener('click', (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        checkAllDeliveredParcelsOnPage();
+      });
+    }
+
+    const isFullyChecked = totalRows > 0 && uncheckedBoxes.length === 0;
+    const isAmountIdentical = balanceVal > 0 && Math.abs(currentSettleAmt - balanceVal) < 0.05;
+
+    if (isFullyChecked || isAmountIdentical) {
+      checkAllBtn.style.background = '#389e0d';
+      checkAllBtn.style.borderColor = '#389e0d';
+      const amtFmt = balanceVal > 0 ? `${balanceVal.toFixed(2)} MAD` : `${totalRows} colis`;
+      checkAllBtn.innerHTML = `<span>✔ Montant Vérifié : ${amtFmt}</span>`;
+    } else {
+      checkAllBtn.style.background = '#52c41a';
+      checkAllBtn.style.borderColor = '#52c41a';
+      checkAllBtn.innerHTML = `<span>☑ Tout Cocher pour Règlement (${uncheckedBoxes.length} restants)</span>`;
+    }
+  }
+
   // ── Verify Completed Trips (Rider List) ─────────────────────
 
   function ensureVerifyCompletedButton() {
@@ -929,6 +1339,19 @@
         container.insertBefore(verifyBtn, resetBtn.nextSibling);
       } else {
         container.appendChild(verifyBtn);
+      }
+
+      // Also insert a direct shortcut to Rider Settlement Amounts
+      if (!document.querySelector('.chrono-ext-recon-settlements-btn')) {
+        const settleBtn = document.createElement('button');
+        settleBtn.className = resetBtn.className + " chrono-ext-recon-settlements-btn";
+        settleBtn.innerHTML = `<span>💰 Règlements Livreur</span>`;
+        settleBtn.addEventListener('click', (e) => {
+          e.preventDefault();
+          e.stopPropagation();
+          showRiderSettlementModal();
+        });
+        container.appendChild(settleBtn);
       }
 
       verifyBtn.addEventListener('click', async (e) => {
@@ -1047,6 +1470,8 @@
         console.warn("[ChronoExt] Could not extract date from page, using today:", e);
       }
 
+      const currentHubId = getCurrentHubId();
+
       // Exact payload from Shipsy Network tab
       const payload = {
         "last_trip_id": null,
@@ -1059,7 +1484,7 @@
         "to_date": toDate,
         "date_field": "last_main_event_time",
         "organisation_reference_number": "",
-        "hub_id": "2477050730750414061", // Using the one captured from network tab
+        "hub_id": currentHubId,
         "bucket": "retail_completed",
         "timezone": "Africa/Casablanca"
       };
@@ -1323,7 +1748,7 @@
         to_date: toDate,
         date_field: 'last_main_event_time',
         organisation_reference_number: '',
-        hub_id: '2477050730750414061',
+        hub_id: getCurrentHubId(),
         bucket: 'retail_completed',
         timezone: 'Africa/Casablanca'
       };
@@ -1952,26 +2377,21 @@
   // ── Rider Settlement Menu & Modal ────────────────────
 
   function ensureSettlementMenu() {
-    const drawer = document.querySelector('.ant-drawer-open');
     const existingMenuItem = document.querySelector('.chrono-ext-settlement-menu-item');
+    const drawer = document.querySelector('.ant-drawer-open');
 
-    // If the drawer is closed, clean up any menu item
-    if (!drawer) {
-      if (existingMenuItem) existingMenuItem.remove();
-      return;
-    }
-
-    // Search specifically for Financial Operations submenu items inside the open drawer
-    const drawerItems = Array.from(drawer.querySelectorAll('.ant-menu-item'));
+    // Search specifically for Financial Operations submenu items in open drawer or desktop sidebar
+    const navScope = drawer || document.querySelector('.ant-layout-sider') || document.querySelector('.ant-pro-sider') || document;
+    const menuItems = Array.from(navScope.querySelectorAll('.ant-menu-item'));
     let financeAnchorItem = null;
 
-    for (const item of drawerItems) {
+    for (const item of menuItems) {
       if (item.classList.contains('chrono-ext-settlement-menu-item')) continue;
 
       const link = item.querySelector('a');
       const href = link ? (link.getAttribute('href') || '') : '';
       const menuId = item.getAttribute('data-menu-id') || '';
-      const text = (item.textContent || '').trim();
+      const text = (item.textContent || '').trim().toLowerCase();
 
       // Strictly identify Financial Operations sub-items
       const isFinanceSubItem = 
@@ -1979,9 +2399,10 @@
         href.includes('/ops/transactionsHistory') ||
         menuId.includes('riderReconciliation') ||
         menuId.includes('transactionsHistory') ||
-        text === 'Rider Reconciliation' ||
-        text === 'Transactions History' ||
-        text === 'Historique des transactions';
+        text.includes('rider reconciliation') ||
+        text.includes('réconciliation') ||
+        text.includes('transactions history') ||
+        text.includes('historique des transactions');
 
       if (isFinanceSubItem) {
         financeAnchorItem = item;
@@ -1989,9 +2410,11 @@
       }
     }
 
-    // If Financial Operations is NOT the active menu, remove our item immediately
+    // If Financial Operations is NOT found / visible, remove menu item if drawer is open or absent
     if (!financeAnchorItem) {
-      if (existingMenuItem) existingMenuItem.remove();
+      if (drawer || !document.querySelector('.ant-layout-sider')) {
+        if (existingMenuItem) existingMenuItem.remove();
+      }
       return;
     }
 
@@ -2025,7 +2448,11 @@
       </span>
     `;
 
-    financeAnchorItem.parentNode.insertBefore(newItem, financeAnchorItem.nextSibling);
+    if (financeAnchorItem.nextSibling) {
+      parentList.insertBefore(newItem, financeAnchorItem.nextSibling);
+    } else {
+      parentList.appendChild(newItem);
+    }
 
     newItem.addEventListener('click', (e) => {
       e.preventDefault();
@@ -2088,8 +2515,8 @@
                 <tr>
                   <th style="text-align: left;">Livreur</th>
                   <th style="text-align: center; width: 90px;">Code</th>
-                  <th style="text-align: center; width: 80px;">Colis</th>
-                  <th style="text-align: right; width: 140px;">Montant Réglé</th>
+                  <th style="text-align: center; width: 90px;">Colis</th>
+                  <th style="text-align: right; width: 170px;">Montant (MAD)</th>
                   <th style="text-align: center; width: 80px;">Détails</th>
                 </tr>
               </thead>
@@ -2143,8 +2570,12 @@
         tbody.innerHTML = `<tr><td colspan="5" style="padding: 24px; text-align: center; color: #888;">${currentRiders.length === 0 ? 'Aucun règlement trouvé pour cette date.' : 'Aucun résultat correspondant.'}</td></tr>`;
       } else {
         filtered.forEach((item, idx) => {
-          totalCount += (item.deliveredCount || item.count || 0);
-          totalAmt += item.amount;
+          const delCount = item.deliveredCount != null && item.deliveredCount > 0 
+            ? item.deliveredCount 
+            : (item.parcels && item.parcels.length > 0 ? item.parcels.length : (item.count || 0));
+
+          totalCount += delCount;
+          totalAmt += (item.amount || 0);
 
           const reconciledByList = Array.from(new Set((item.parcels || []).map(p => p.employee_name).filter(Boolean))).join(', ') || item.cashier || 'N.A.';
 
@@ -2157,13 +2588,18 @@
             </td>
             <td style="text-align: center;"><span style="background:#f5f5f5; padding:2px 6px; border-radius:4px; font-size:12px; font-family:monospace;">${item.code || '-'}</span></td>
             <td style="text-align: center;">
-              <span style="background:#e6f7ff; color:#1890ff; padding:2px 8px; border-radius:10px; font-weight:600; font-size:12px;" title="${item.deliveredCount || item.count} Livrés / ${item.undeliveredCount || 0} Non livrés">
-                ${item.deliveredCount || item.count} livrés
+              <span style="background:#e6f7ff; color:#1890ff; padding:2px 8px; border-radius:10px; font-weight:600; font-size:12px;" title="${delCount} Livrés / ${item.undeliveredCount || 0} Non livrés">
+                ${delCount} livrés
               </span>
               ${item.undeliveredCount > 0 ? `<div style="font-size:11px; color:#ff4d4f; margin-top:2px; font-weight:500;">${item.undeliveredCount} non-livrés</div>` : ''}
             </td>
             <td style="text-align: right; font-weight: 600; color: #262626;">
-              ${item.amount.toFixed(2)} MAD
+              <div style="font-size:14px; font-weight:700; color:#1e293b;">${(item.amount || 0).toFixed(2)} MAD</div>
+              ${item.settledAmount > 0 
+                ? `<div style="font-size:11px; color:#389e0d; font-weight:600;">✔ Réglé${item.collectedAmount > 0 && Math.abs(item.collectedAmount - item.settledAmount) > 0.01 ? ` <span style="font-weight:normal; color:#8c8c8c;">(Col: ${item.collectedAmount.toFixed(2)})</span>` : ''}</div>`
+                : (item.collectedAmount > 0 
+                    ? `<div style="font-size:11px; color:#1890ff; font-weight:600;">⏳ CRBT (À régler)</div>` 
+                    : (item.amount > 0 ? `<div style="font-size:11px; color:#fa8c16;">Crédits Course</div>` : '<div style="font-size:11px; color:#8c8c8c;">0.00 MAD</div>'))}
               ${item.status === 'in_transit' ? '<div style="font-size:10px; color:#fa8c16; font-weight:normal;">En course</div>' : ''}
             </td>
             <td style="text-align: center;"><button class="ant-btn ant-btn-sm chrono-details-toggle" style="font-size:11px; height:24px; padding:0 8px;">Détails</button></td>
@@ -2178,7 +2614,7 @@
             <td colspan="5" style="padding: 12px 16px;">
               <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:8px; flex-wrap:wrap; gap:8px;">
                 <div style="font-weight:600; font-size:13px; color:#262626;">
-                  Colis pour ${item.name} (<span class="chrono-sub-count">${item.deliveredCount || item.count} livrés</span>${item.undeliveredCount > 0 ? `, <span style="color:#ff4d4f;">${item.undeliveredCount} non-livrés</span>` : ''}) :
+                  Colis pour ${item.name} (<span class="chrono-sub-count">${delCount} livrés</span>${item.undeliveredCount > 0 ? `, <span style="color:#ff4d4f;">${item.undeliveredCount} non-livrés</span>` : ''}) :
                 </div>
                 <div class="chrono-sub-filter-buttons" style="display:flex; gap:6px;">
                   <button class="ant-btn ant-btn-sm chrono-btn-filter-all" style="font-size:11px; height:24px; padding:0 8px; background:#1890ff; color:#fff; border-color:#1890ff;">Tous</button>
@@ -2383,18 +2819,21 @@
 
       // Sheet 1: Summary per rider
       const wsSummaryData = [
-        ["Livreur", "N° Course", "Colis Livrés", "Colis Non-Livrés", "Total Colis", "Montant Règlement (MAD)", "Reconciled By", "Statut Course"],
+        ["Livreur", "N° Course", "Colis Livrés", "Colis Non-Livrés", "Total Colis", "Montant (MAD)", "Montant Réglé (MAD)", "Montant Collecté CRBT (MAD)", "Statut Règlement", "Reconciled By", "Statut Course"],
         ...currentRiders.map(d => [
           d.name,
           d.code,
-          d.deliveredCount || d.count,
+          d.count || d.deliveredCount || 0,
           d.undeliveredCount || 0,
-          d.totalCount || d.count,
+          d.totalCount || d.count || 0,
           d.amount,
+          d.settledAmount || 0,
+          d.collectedAmount || 0,
+          d.settledAmount > 0 ? 'Réglé' : (d.collectedAmount > 0 ? 'CRBT Collecté (À Régler)' : 'N.A.'),
           d.cashier || Array.from(new Set((d.parcels || []).map(p => p.employee_name).filter(Boolean))).join(', ') || 'N.A.',
           d.status === 'in_transit' ? 'En course' : 'Terminée'
         ]),
-        ["TOTAL HUB", "", parseInt(totalCountEl.textContent, 10), "", "", parseFloat(totalAmountEl.textContent), "", ""]
+        ["TOTAL HUB", "", parseInt(totalCountEl.textContent, 10), "", "", parseFloat(totalAmountEl.textContent), "", "", "", "", ""]
       ];
       const wsSummary = XLSX.utils.aoa_to_sheet(wsSummaryData);
       XLSX.utils.book_append_sheet(wb, wsSummary, "Synthèse Règlements");
@@ -2487,9 +2926,13 @@
     const tripUrl = "https://projectxeuapi.shipsy.io/api/retaildashboard/tripmanager/get";
     const reconUrl = "https://projectxeuapi.shipsy.io/api/Dashboard/riderReconciliation/getReconciliationData";
     
-    // Parse date into DD/MM/YYYY
+    // Parse date into DD/MM/YYYY, DD-MM-YYYY, YYYY-MM-DD
     const [year, month, day] = dateStr.split('-');
-    const dmyStr = `${day}/${month}/${year}`;
+    const dmySlash = `${day}/${month}/${year}`;
+    const dmyDash = `${day}-${month}-${year}`;
+
+    // Dynamically retrieve current hub
+    const hubId = getCurrentHubId();
 
     // 1. Fetch trips from Trip Manager for the selected date
     let allTrips = [];
@@ -2501,7 +2944,7 @@
           body: JSON.stringify({
             from_date: dateStr,
             to_date: dateStr,
-            hub_id: "2477050730750414061",
+            hub_id: hubId,
             bucket: "retail_completed"
           })
         }),
@@ -2511,7 +2954,7 @@
           body: JSON.stringify({
             from_date: dateStr,
             to_date: dateStr,
-            hub_id: "2477050730750414061",
+            hub_id: hubId,
             bucket: "retail_in_transit"
           })
         })
@@ -2531,16 +2974,16 @@
       console.warn("[ChronoExt] Failed to fetch trips from tripmanager:", err);
     }
 
-    // 2. Fetch settlement transactions from Reconciliation ledger
-    let allSettlements = [];
+    // 2. Fetch transactions (COD collections and settlements) from Reconciliation ledger
+    let allReconEntries = [];
     const seenIds = new Set();
 
     try {
-      for (let pNo = 1; pNo <= 5; pNo++) {
+      for (let pNo = 1; pNo <= 8; pNo++) {
         const reconPayload = {
           startDate: null,
           endDate: null,
-          hubList: ["2477050730750414061"],
+          hubList: [hubId],
           pageNo: pNo,
           resultsPerPage: 100,
           cashSource: "ALL"
@@ -2559,21 +3002,38 @@
         let hasOlderDate = false;
         rList.forEach(item => {
           const creditType = (item.credit_type || '').toLowerCase();
-          if (creditType !== 'settlement') return;
+          // Include COD collections ('cod'/'cash') and settlements ('settlement')
+          if (creditType !== 'settlement' && creditType !== 'cod' && creditType !== 'cash') return;
 
           const created = item.created_at || '';
-          if (created.includes(dmyStr) || created.includes(dateStr) || !created) {
-            const id = item.id || `${item.reference_number}_${created}_${item.amount}`;
+          let isMatch = false;
+
+          if (typeof created === 'string') {
+            if (created.includes(dmySlash) || created.includes(dmyDash) || created.includes(dateStr)) {
+              isMatch = true;
+            } else if (created.length >= 10) {
+              hasOlderDate = true;
+            }
+          } else if (typeof created === 'number') {
+            const d = new Date(created);
+            const itemDateStr = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+            if (itemDateStr === dateStr) {
+              isMatch = true;
+            } else {
+              hasOlderDate = true;
+            }
+          }
+
+          if (isMatch) {
+            const id = item.id || `${item.reference_number}_${created}_${item.amount}_${creditType}`;
             if (!seenIds.has(id)) {
               seenIds.add(id);
-              allSettlements.push(item);
+              allReconEntries.push(item);
             }
-          } else {
-            hasOlderDate = true;
           }
         });
 
-        if (hasOlderDate && pNo > 1) break;
+        if (hasOlderDate && pNo > 2) break;
       }
     } catch (err) {
       console.warn("[ChronoExt] Failed to fetch reconciliation data:", err);
@@ -2586,22 +3046,23 @@
       return (raw || '').toLowerCase().replace(/[^a-z0-9]/g, ' ').replace(/\s+/g, ' ').trim();
     }
 
-    // A. Populate from Trip Manager (Official source of task counts)
+    // A. Populate from Trip Manager (official trip reference and status)
     allTrips.forEach(t => {
       const driverName = (t.extra_details?.driver_name || t.worker_name || 'Livreur').trim();
-      const tripRef = t.organisation_reference_number || t.trip_reference_number || 'MOH';
-      const key = getCanonicalName(driverName) || tripRef.toLowerCase();
+      const tripRef = t.organisation_reference_number || t.trip_reference_number || '';
+      const key = getCanonicalName(driverName) || (tripRef ? tripRef.toLowerCase() : 'unknown');
 
       if (!riderMap[key]) {
         riderMap[key] = {
           name: driverName,
-          code: tripRef,
-          tripRefs: [tripRef],
+          code: tripRef || '-',
+          tripRefs: tripRef ? [tripRef] : [],
           deliveredCount: 0,
           undeliveredCount: 0,
           totalCount: 0,
           status: t.status || 'completed',
           tripCredits: 0,
+          collectedAmount: 0,
           settledAmount: 0,
           amount: 0,
           cashier: null,
@@ -2611,6 +3072,9 @@
       } else {
         if (tripRef && !riderMap[key].tripRefs.includes(tripRef)) {
           riderMap[key].tripRefs.push(tripRef);
+          if (!riderMap[key].code || riderMap[key].code === '-' || riderMap[key].code === 'RECON') {
+            riderMap[key].code = tripRef;
+          }
         }
       }
 
@@ -2622,11 +3086,12 @@
       }
     });
 
-    // B. Correlate with settlements from reconciliation ledger
-    allSettlements.forEach(item => {
+    // B. Correlate with transactions from reconciliation ledger
+    allReconEntries.forEach(item => {
       const riderName = (item.worker_name || 'Inconnu').trim();
       const code = (item.worker_code || '').trim();
       const positiveAmt = Math.abs(parseFloat(item.amount) || 0);
+      const creditType = (item.credit_type || '').toLowerCase();
       const key = getCanonicalName(riderName) || (code ? code.toLowerCase() : 'unknown');
 
       if (!riderMap[key]) {
@@ -2639,38 +3104,53 @@
           totalCount: 0,
           status: 'completed',
           tripCredits: 0,
+          collectedAmount: 0,
           settledAmount: 0,
           amount: 0,
-          cashier: item.employee_name,
+          cashier: null,
           parcels: [],
           detailsLoaded: false
         };
       }
 
-      riderMap[key].settledAmount = (riderMap[key].settledAmount || 0) + positiveAmt;
-      if (item.employee_name && !riderMap[key].cashier) {
-        riderMap[key].cashier = item.employee_name;
+      if (code && (!riderMap[key].code || riderMap[key].code === '-' || riderMap[key].code === 'RECON')) {
+        riderMap[key].code = code;
       }
-      riderMap[key].parcels.push({
-        id: item.id,
-        reference_number: item.reference_number,
-        amount: positiveAmt,
-        created_at: item.created_at,
-        employee_name: item.employee_name,
-        isDelivered: true
-      });
+
+      if (creditType === 'settlement') {
+        riderMap[key].settledAmount = (riderMap[key].settledAmount || 0) + positiveAmt;
+        if (item.employee_name && !riderMap[key].cashier && item.employee_name !== 'N. A.') {
+          riderMap[key].cashier = item.employee_name;
+        }
+      } else {
+        // credit_type === 'cod' or 'cash'
+        riderMap[key].collectedAmount = (riderMap[key].collectedAmount || 0) + positiveAmt;
+        riderMap[key].parcels.push({
+          id: item.id,
+          reference_number: item.reference_number,
+          amount: positiveAmt,
+          created_at: item.created_at,
+          employee_name: item.employee_name,
+          isDelivered: true
+        });
+      }
     });
 
-    // C. Finalize amount and count fallbacks
+    // C. Finalize amounts and count fallbacks
     Object.values(riderMap).forEach(r => {
       const settled = r.settledAmount || 0;
+      const collected = r.collectedAmount || 0;
       const credits = r.tripCredits || 0;
-      r.amount = settled > 0 ? settled : credits;
 
-      if (r.deliveredCount === 0 && r.parcels.length > 0) {
+      // Primary settlement amount: settled amount if cashier settled, otherwise collected COD, otherwise trip credits
+      r.amount = settled > 0 ? settled : (collected > 0 ? collected : credits);
+
+      // Fallback for counts so it never shows undefined or 0 if COD parcels were delivered
+      if ((!r.deliveredCount || r.deliveredCount === 0) && r.parcels.length > 0) {
         r.deliveredCount = r.parcels.length;
-        r.totalCount = r.parcels.length;
       }
+      r.count = r.deliveredCount || r.parcels.length || 0;
+      r.totalCount = Math.max(r.totalCount || 0, r.count + (r.undeliveredCount || 0));
     });
 
     return Object.values(riderMap);

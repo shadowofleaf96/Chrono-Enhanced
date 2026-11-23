@@ -1,0 +1,160 @@
+{
+  "tag": "DIV",
+  "cls": "",
+  "id": "root",
+  "h": 790,
+  "w": 411,
+  "top": 0,
+  "bottom": 790,
+  "display": "block",
+  "children": [
+    {
+      "tag": "DIV",
+      "cls": "lr-mainDiv-0-3-13 lr-mainDiv-d0-0-3-16",
+      "id": "",
+      "h": 100,
+      "w": 411,
+      "top": 0,
+      "bottom": 100,
+      "display": "flex",
+      "children": [
+        {
+          "tag": "DIV",
+          "cls": "",
+          "id": "",
+          "h": 0,
+          "w": 411,
+          "top": 0,
+          "bottom": 0,
+          "display": "block",
+          "children": []
+        },
+        {
+          "tag": "DIV",
+          "cls": "lr-contentDiv-0-3-14",
+          "id": "",
+          "h": 100,
+          "w": 411,
+          "top": 0,
+          "bottom": 100,
+          "display": "block",
+          "children": [
+            {
+              "tag": "DIV",
+              "cls": "Component-topDiv-0-3-21",
+              "id": "",
+              "h": 100,
+              "w": 408,
+              "top": 0,
+              "bottom": 100,
+              "display": "flex",
+              "children": [
+                {
+                  "tag": "DIV",
+                  "cls": "withI18nextTranslation(Unknown)-navbar-0-3-42",
+                  "id": "",
+                  "h": 44,
+                  "w": 411,
+                  "top": 0,
+                  "bottom": 44,
+                  "display": "flex",
+                  "children": [
+                    {
+                      "tag": "DIV",
+                      "cls": "withI18nextTranslation(Unknown)-leftDiv-0-3-4",
+                      "id": "",
+                      "h": 34,
+                      "w": 34,
+                      "top": 5,
+                      "bottom": 39,
+                      "display": "flex",
+                      "children": []
+                    },
+                    {
+                      "tag": "DIV",
+                      "cls": "withI18nextTranslation(Unknown)-filterGroupTo",
+                      "id": "",
+                      "h": 40,
+                      "w": 395,
+                      "top": 2,
+                      "bottom": 42,
+                      "display": "flex",
+                      "children": []
+                    },
+                    {
+                      "tag": "DIV",
+                      "cls": "",
+                      "id": "",
+                      "h": 0,
+                      "w": 0,
+                      "top": 22,
+                      "bottom": 22,
+                      "display": "block",
+                      "children": []
+                    }
+                  ]
+                },
+                {
+                  "tag": "DIV",
+                  "cls": "Component-mainDiv-0-3-22",
+                  "id": "",
+                  "h": 56,
+                  "w": 408,
+                  "top": 44,
+                  "bottom": 100,
+                  "display": "flex",
+                  "children": [
+                    {
+                      "tag": "DIV",
+                      "cls": "Component-containerDefaultFilter-0-3-27",
+                      "id": "",
+                      "h": 56,
+                      "w": 411,
+                      "top": 44,
+                      "bottom": 100,
+                      "display": "flex",
+                      "children": []
+                    },
+                    {
+                      "tag": "DIV",
+                      "cls": "",
+                      "id": "",
+                      "h": 0,
+                      "w": 408,
+                      "top": 100,
+                      "bottom": 100,
+                      "display": "block",
+                      "children": []
+                    }
+                  ]
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "tag": "DIV",
+          "cls": "lr-bannerDiv-0-3-15",
+          "id": "",
+          "h": 0,
+          "w": 0,
+          "top": -15,
+          "bottom": -15,
+          "display": "flex",
+          "children": []
+        },
+        {
+          "tag": "DIV",
+          "cls": "",
+          "id": "generic-bulk-upload-service-container",
+          "h": 0,
+          "w": 411,
+          "top": 100,
+          "bottom": 100,
+          "display": "block",
+          "children": []
+        }
+      ]
+    }
+  ]
+}

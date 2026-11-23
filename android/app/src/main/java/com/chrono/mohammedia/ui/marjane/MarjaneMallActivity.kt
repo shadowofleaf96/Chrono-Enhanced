@@ -21,10 +21,8 @@ import android.widget.Toast
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.appcompat.app.AppCompatActivity
 import com.chrono.mohammedia.R
-import com.chrono.mohammedia.data.repository.RiderRepository
 import com.chrono.mohammedia.databinding.ActivityMarjaneMallBinding
-import com.chrono.mohammedia.ui.MainActivity
-import com.chrono.mohammedia.ui.login.LoginActivity
+import com.chrono.mohammedia.ui.chrono.ChronoWebActivity
 import com.chrono.mohammedia.ui.portal.PortalSelectorActivity
 import com.chrono.mohammedia.ui.scanner.ScannerActivity
 import java.io.File
@@ -275,6 +273,19 @@ class MarjaneMallActivity : AppCompatActivity() {
                             hasListener: function(fn) { return this._listeners.indexOf(fn) !== -1; }
                         },
                         sendMessage: function(msg, cb) {
+                            if (msg && msg.action === 'storeRefusedColis' && Array.isArray(msg.data) && window.chrome && window.chrome.storage && window.chrome.storage.local) {
+                                window.chrome.storage.local.get({ refusedColis: [] }, function(result) {
+                                    var filtered = msg.data.filter(function(item) {
+                                        return item.colis && ['GOF', 'GMK', 'GFS', 'GTG', 'GRB'].some(function(p) { return item.colis.startsWith(p); });
+                                    });
+                                    var existingSet = new Set((result.refusedColis || []).map(function(item) { return item.colis; }));
+                                    var uniqueNew = filtered.filter(function(item) { return !existingSet.has(item.colis); });
+                                    if (uniqueNew.length > 0) {
+                                        var updated = (result.refusedColis || []).concat(uniqueNew);
+                                        window.chrome.storage.local.set({ refusedColis: updated });
+                                    }
+                                });
+                            }
                             if (typeof cb === 'function') setTimeout(function() { cb({ success: true }); }, 10);
                         }
                     };
@@ -643,15 +654,10 @@ class MarjaneMallActivity : AppCompatActivity() {
     }
 
     private fun switchToChrono() {
-        val repo = RiderRepository.getInstance(this)
-        val targetIntent = if (repo.hasValidSavedSession()) {
-            Intent(this, MainActivity::class.java)
-        } else {
-            LoginActivity.createIntent(this, forceLogin = false)
-        }.apply {
+        val intent = Intent(this, ChronoWebActivity::class.java).apply {
             flags = Intent.FLAG_ACTIVITY_CLEAR_TOP or Intent.FLAG_ACTIVITY_SINGLE_TOP
         }
-        startActivity(targetIntent)
+        startActivity(intent)
     }
 
     private fun openPortalSelector() {

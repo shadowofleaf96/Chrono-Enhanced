@@ -1,0 +1,475 @@
+{
+  "tag": "DIV",
+  "cls": "Ql-mainDiv-0-3-190",
+  "id": "",
+  "h": 492,
+  "w": 408,
+  "top": 93,
+  "bottom": 585,
+  "flex": "1 1 auto",
+  "display": "flex",
+  "children": [
+    {
+      "tag": "DIV",
+      "cls": "",
+      "id": "",
+      "h": 92,
+      "w": 408,
+      "top": 93,
+      "bottom": 185,
+      "flex": "0 0 auto",
+      "display": "block",
+      "children": [
+        {
+          "tag": "DIV",
+          "cls": "",
+          "id": "",
+          "h": 92,
+          "w": 408,
+          "top": 93,
+          "bottom": 185,
+          "flex": "0 1 auto",
+          "display": "block",
+          "children": [
+            {
+              "tag": "BUTTON",
+              "cls": "ant-btn ant-btn-sm",
+              "id": "chrono-filter-toggle-btn",
+              "h": 32,
+              "w": 83,
+              "top": 97,
+              "bottom": 129,
+              "flex": "0 0 auto",
+              "display": "inline-flex",
+              "children": [
+                {
+                  "tag": "SPAN",
+                  "cls": "",
+                  "id": "",
+                  "h": 16,
+                  "w": 10,
+                  "top": 105,
+                  "bottom": 121,
+                  "flex": "0 1 auto",
+                  "display": "block",
+                  "children": []
+                }
+              ]
+            },
+            {
+              "tag": "DIV",
+              "cls": "Ql-filterBarWrapper-0-3-212 chrono-filters-hi",
+              "id": "",
+              "h": 0,
+              "w": 0,
+              "top": 0,
+              "bottom": 0,
+              "flex": "0 1 auto",
+              "display": "none",
+              "children": [
+                {
+                  "tag": "DIV",
+                  "cls": "mainDiv-0-3-226",
+                  "id": "",
+                  "h": 0,
+                  "w": 0,
+                  "top": 0,
+                  "bottom": 0,
+                  "flex": "1 1 auto",
+                  "display": "flex",
+                  "children": [
+                    {
+                      "tag": "FORM",
+                      "cls": "ant-form ant-form-inline formContainer-0-3-23",
+                      "id": "",
+                      "h": 0,
+                      "w": 0,
+                      "top": 0,
+                      "bottom": 0,
+                      "flex": "0 1 auto",
+                      "display": "flex",
+                      "children": [
+                        {
+                          "tag": "DIV",
+                          "cls": "ant-row ant-form-item nonSelectFilters-0-3-23",
+                          "id": "",
+                          "h": 0,
+                          "w": 0,
+                          "top": 0,
+                          "bottom": 0,
+                          "flex": "1 1 45%",
+                          "display": "flex",
+                          "children": []
+                        },
+                        {
+                          "tag": "DIV",
+                          "cls": "ant-row ant-form-item nonSelectFilters-0-3-23",
+                          "id": "",
+                          "h": 0,
+                          "w": 0,
+                          "top": 0,
+                          "bottom": 0,
+                          "flex": "1 1 45%",
+                          "display": "flex",
+                          "children": []
+                        },
+                        {
+                          "tag": "DIV",
+                          "cls": "ant-row ant-form-item nonSelectFilters-0-3-23",
+                          "id": "",
+                          "h": 0,
+                          "w": 0,
+                          "top": 0,
+                          "bottom": 0,
+                          "flex": "1 1 45%",
+                          "display": "flex",
+                          "children": []
+                        },
+                        {
+                          "tag": "DIV",
+                          "cls": "ant-row ant-form-item nonSelectFilters-0-3-23",
+                          "id": "",
+                          "h": 0,
+                          "w": 0,
+                          "top": 0,
+                          "bottom": 0,
+                          "flex": "1 1 45%",
+                          "display": "flex",
+                          "children": []
+                        },
+                        {
+                          "tag": "DIV",
+                          "cls": "ant-row ant-form-item actionButtons-0-3-227",
+                          "id": "",
+                          "h": 0,
+                          "w": 0,
+                          "top": 0,
+                          "bottom": 0,
+                          "flex": "1 1 45%",
+                          "display": "flex",
+                          "children": []
+                        }
+                      ]
+                    }
+                  ]
+                },
+                {
+                  "tag": "BUTTON",
+                  "cls": "ant-btn ant-btn-primary middleButton-0-3-152 ",
+                  "id": "",
+                  "h": 0,
+                  "w": 0,
+                  "top": 0,
+                  "bottom": 0,
+                  "flex": "0 0 auto",
+                  "display": "inline-flex",
+                  "children": [
+                    {
+                      "tag": "SPAN",
+                      "cls": "",
+                      "id": "",
+                      "h": 0,
+                      "w": 0,
+                      "top": 0,
+                      "bottom": 0,
+                      "flex": "0 1 auto",
+                      "display": "block",
+                      "children": []
+                    }
+                  ]
+                }
+              ]
+            },
+            {
+              "tag": "DIV",
+              "cls": "Ql-filterActionDivider-0-3-219",
+              "id": "",
+              "h": 0,
+              "w": 0,
+              "top": 0,
+              "bottom": 0,
+              "flex": "0 1 auto",
+              "display": "none",
+              "children": []
+            },
+            {
+              "tag": "DIV",
+              "cls": "Ql-searchUploadDiv-0-3-191",
+              "id": "",
+              "h": 52,
+              "w": 408,
+              "top": 133,
+              "bottom": 185,
+              "flex": "0 0 auto",
+              "display": "flex",
+              "children": [
+                {
+                  "tag": "DIV",
+                  "cls": "",
+                  "id": "",
+                  "h": 40,
+                  "w": 388,
+                  "top": 139,
+                  "bottom": 179,
+                  "flex": "0 0 auto",
+                  "display": "block",
+                  "children": [
+                    {
+                      "tag": "DIV",
+                      "cls": "Component-actionsBar-0-3-274",
+                      "id": "",
+                      "h": 52,
+                      "w": 388,
+                      "top": 139,
+                      "bottom": 191,
+                      "flex": "0 0 auto",
+                      "display": "flex",
+                      "children": [
+                        {
+                          "tag": "DIV",
+                          "cls": "Component-actionButtonDiv-0-3-278",
+                          "id": "",
+                          "h": 19,
+                          "w": 61,
+                          "top": 155,
+                          "bottom": 174,
+                          "flex": "0 1 auto",
+                          "display": "flex",
+                          "children": []
+                        },
+                        {
+                          "tag": "BUTTON",
+                          "cls": "ant-btn middleButton-0-3-152 secondaryButton-",
+                          "id": "",
+                          "h": 38,
+                          "w": 140,
+                          "top": 146,
+                          "bottom": 184,
+                          "flex": "0 0 auto",
+                          "display": "flex",
+                          "children": []
+                        },
+                        {
+                          "tag": "BUTTON",
+                          "cls": "ant-btn middleButton-0-3-152 secondaryButton-",
+                          "id": "",
+                          "h": 38,
+                          "w": 90,
+                          "top": 146,
+                          "bottom": 184,
+                          "flex": "0 0 auto",
+                          "display": "flex",
+                          "children": []
+                        },
+                        {
+                          "tag": "BUTTON",
+                          "cls": "ant-btn middleButton-0-3-152 secondaryButton-",
+                          "id": "",
+                          "h": 38,
+                          "w": 110,
+                          "top": 146,
+                          "bottom": 184,
+                          "flex": "0 0 auto",
+                          "display": "flex",
+                          "children": []
+                        },
+                        {
+                          "tag": "BUTTON",
+                          "cls": "ant-btn middleButton-0-3-152 secondaryButton-",
+                          "id": "",
+                          "h": 38,
+                          "w": 118,
+                          "top": 146,
+                          "bottom": 184,
+                          "flex": "0 0 auto",
+                          "display": "flex",
+                          "children": []
+                        },
+                        {
+                          "tag": "BUTTON",
+                          "cls": "ant-btn middleButton-0-3-152 secondaryButton-",
+                          "id": "",
+                          "h": 38,
+                          "w": 65,
+                          "top": 146,
+                          "bottom": 184,
+                          "flex": "0 0 auto",
+                          "display": "flex",
+                          "children": []
+                        },
+                        {
+                          "tag": "BUTTON",
+                          "cls": "ant-btn middleButton-0-3-152 secondaryButton-",
+                          "id": "",
+                          "h": 38,
+                          "w": 66,
+                          "top": 146,
+                          "bottom": 184,
+                          "flex": "0 0 auto",
+                          "display": "flex",
+                          "children": []
+                        },
+                        {
+                          "tag": "DIV",
+                          "cls": "Component-extraActions-0-3-277",
+                          "id": "",
+                          "h": 52,
+                          "w": 372,
+                          "top": 139,
+                          "bottom": 191,
+                          "flex": "0 0 auto",
+                          "display": "flex",
+                          "children": []
+                        }
+                      ]
+                    }
+                  ]
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "tag": "DIV",
+      "cls": "Ql-tableContainer-0-3-195",
+      "id": "",
+      "h": 400,
+      "w": 408,
+      "top": 185,
+      "bottom": 585,
+      "flex": "1 1 auto",
+      "display": "flex",
+      "children": [
+        {
+          "tag": "DIV",
+          "cls": "",
+          "id": "",
+          "h": 400,
+          "w": 408,
+          "top": 185,
+          "bottom": 585,
+          "flex": "1 1 0px",
+          "display": "block",
+          "children": [
+            {
+              "tag": "DIV",
+              "cls": "compactTable-0-3-443 tableParent-0-3-442 ship",
+              "id": "",
+              "h": 1930,
+              "w": 408,
+              "top": 193,
+              "bottom": 2123,
+              "flex": "1 1 auto",
+              "display": "flex",
+              "children": [
+                {
+                  "tag": "DIV",
+                  "cls": "ant-table-wrapper",
+                  "id": "",
+                  "h": 1930,
+                  "w": 408,
+                  "top": 193,
+                  "bottom": 2123,
+                  "flex": "1 1 auto",
+                  "display": "block",
+                  "children": [
+                    {
+                      "tag": "DIV",
+                      "cls": "ant-spin-nested-loading",
+                      "id": "",
+                      "h": 1930,
+                      "w": 408,
+                      "top": 193,
+                      "bottom": 2123,
+                      "flex": "0 1 auto",
+                      "display": "block",
+                      "children": [
+                        {
+                          "tag": "DIV",
+                          "cls": "ant-spin-container",
+                          "id": "",
+                          "h": 1930,
+                          "w": 408,
+                          "top": 193,
+                          "bottom": 2123,
+                          "flex": "0 1 auto",
+                          "display": "block",
+                          "children": []
+                        }
+                      ]
+                    }
+                  ]
+                }
+              ]
+            },
+            {
+              "tag": "DIV",
+              "cls": "erd_scroll_detection_container erd_scroll_det",
+              "id": "",
+              "h": 0,
+              "w": 0,
+              "top": 185,
+              "bottom": 185,
+              "flex": "0 1 auto",
+              "display": "inline",
+              "children": [
+                {
+                  "tag": "DIV",
+                  "cls": "erd_scroll_detection_container",
+                  "id": "",
+                  "h": 400,
+                  "w": 408,
+                  "top": 185,
+                  "bottom": 585,
+                  "flex": "0 0 auto",
+                  "display": "block",
+                  "children": [
+                    {
+                      "tag": "DIV",
+                      "cls": "erd_scroll_detection_container",
+                      "id": "",
+                      "h": 409,
+                      "w": 417,
+                      "top": 180,
+                      "bottom": 589,
+                      "flex": "0 0 auto",
+                      "display": "block",
+                      "children": [
+                        {
+                          "tag": "DIV",
+                          "cls": "",
+                          "id": "",
+                          "h": 409,
+                          "w": 417,
+                          "top": 180,
+                          "bottom": 589,
+                          "flex": "0 0 auto",
+                          "display": "block",
+                          "children": []
+                        },
+                        {
+                          "tag": "DIV",
+                          "cls": "",
+                          "id": "",
+                          "h": 409,
+                          "w": 417,
+                          "top": 180,
+                          "bottom": 589,
+                          "flex": "0 0 auto",
+                          "display": "block",
+                          "children": []
+                        }
+                      ]
+                    }
+                  ]
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

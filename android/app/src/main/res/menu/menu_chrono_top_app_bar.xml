@@ -1,0 +1,26 @@
+<?xml version="1.0" encoding="utf-8"?>
+<menu xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto">
+
+    <item
+        android:id="@+id/action_search_chrono"
+        android:icon="@drawable/ic_search"
+        android:title="Rechercher dans la page"
+        app:iconTint="@color/chrono_on_primary"
+        app:showAsAction="always" />
+
+    <item
+        android:id="@+id/action_scan_chrono"
+        android:icon="@drawable/ic_scan_barcode"
+        android:title="Scanner Colis"
+        app:iconTint="@color/chrono_on_primary"
+        app:showAsAction="always" />
+
+    <item
+        android:id="@+id/action_refresh_chrono"
+        android:icon="@drawable/ic_refresh"
+        android:title="Actualiser"
+        app:iconTint="@color/chrono_on_primary"
+        app:showAsAction="always" />
+
+</menu>

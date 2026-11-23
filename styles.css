@@ -277,9 +277,11 @@
   max-height: 60vh !important;
 }
 
-/* Widen the 2nd column (Reference Number) so statuses don't get crushed */
-.ant-table-header colgroup col:nth-child(2),
-.ant-table-body colgroup col:nth-child(2) {
+/* Widen the 2nd column (Reference Number) only inside scan modals so statuses don't get crushed */
+.ant-modal .ant-table-header colgroup col:nth-child(2),
+.ant-modal .ant-table-body colgroup col:nth-child(2),
+.chrono-iframe-overlay .ant-table-header colgroup col:nth-child(2),
+.chrono-iframe-overlay .ant-table-body colgroup col:nth-child(2) {
   width: 500px !important;
   min-width: 500px !important;
 }
@@ -834,5 +836,50 @@
   border-color: #1890ff;
   box-shadow: 0 0 0 2px rgba(24, 144, 255, 0.2);
 }
+
+.chrono-ext-settlement-overlay .chrono-ext-month-modal {
+  width: 920px !important;
+  max-width: 95vw !important;
+  max-height: 90vh !important;
+  display: flex !important;
+  flex-direction: column !important;
+  border-radius: 8px !important;
+}
+
+.chrono-ext-settlement-overlay .chrono-ext-month-modal-body {
+  overflow-y: auto !important;
+  padding: 16px 20px !important;
+}
+
+.chrono-ext-recon-settlements-btn {
+  margin-left: 8px;
+  background-color: #f6ffed !important;
+  border-color: #b7eb8f !important;
+  color: #389e0d !important;
+  font-weight: 600;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  height: 24px;
+  padding: 0 9px;
+  border-radius: 4px;
+  cursor: pointer;
+  border: 1px solid;
+  transition: all 0.3s;
+}
+
+.chrono-ext-recon-settlements-btn:hover {
+  background-color: #d9f7be !important;
+  border-color: #73d13d !important;
+}
+
+@media (max-width: 768px) {
+  .chrono-ext-settlement-overlay .chrono-ext-month-modal {
+    width: 96vw !important;
+    max-width: 440px !important;
+    margin: 8px auto !important;
+  }
+}
+
 
 

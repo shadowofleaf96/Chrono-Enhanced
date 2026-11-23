@@ -24,6 +24,21 @@
       },
       sendMessage: function (msg, cb) {
         console.log("[GoFleet-Polyfill] chrome.runtime.sendMessage:", msg);
+        if (msg && msg.action === "storeRefusedColis" && Array.isArray(msg.data) && window.chrome && window.chrome.storage && window.chrome.storage.local) {
+          window.chrome.storage.local.get({ refusedColis: [] }, function (result) {
+            var filtered = msg.data.filter(function (item) {
+              return item.colis && ["GOF", "GMK", "GFS", "GTG", "GRB"].some(function (p) {
+                return item.colis.startsWith(p);
+              });
+            });
+            var existingSet = new Set((result.refusedColis || []).map(function (item) { return item.colis; }));
+            var uniqueNew = filtered.filter(function (item) { return !existingSet.has(item.colis); });
+            if (uniqueNew.length > 0) {
+              var updated = (result.refusedColis || []).concat(uniqueNew);
+              window.chrome.storage.local.set({ refusedColis: updated });
+            }
+          });
+        }
         if (typeof cb === "function") {
           setTimeout(function () {
             cb({ success: true });
@@ -2182,10 +2197,10 @@ function extractAddress(rootItem, card) {
 }
 
 // In-memory & session cache for ZoneColisList data
-let zoneColisCache = null;
-let zoneColisCacheTime = 0;
-let zoneColisFetchPromise = null;
-const ZONE_CACHE_TTL = 3 * 60 * 1000; // 3 minutes
+var zoneColisCache = typeof zoneColisCache !== "undefined" ? zoneColisCache : null;
+var zoneColisCacheTime = typeof zoneColisCacheTime !== "undefined" ? zoneColisCacheTime : 0;
+var zoneColisFetchPromise = typeof zoneColisFetchPromise !== "undefined" ? zoneColisFetchPromise : null;
+var ZONE_CACHE_TTL = 3 * 60 * 1000; // 3 minutes
 
 async function getZoneColisData(zoneId = 4) {
   const now = Date.now();
@@ -2830,25 +2845,54 @@ async function processConsultationPageCalls() {
   });
 }
 
-const currentPath = window.location.pathname.toLowerCase();
-const currentHref = window.location.href.toLowerCase();
+var currentPath = window.location.pathname.toLowerCase();
+var currentHref = window.location.href.toLowerCase();
 var consultationObserver = null;
 if (
   currentPath.includes("/hub/consultation/") ||
   currentPath.includes("/caissier/caissier/traitementlivreurexcute") ||
   currentHref.includes("traitementlivreurexcute")
 ) {
+  let consultationDebounceTimer = null;
+  function debouncedProcessConsultationCalls() {
+    if (consultationDebounceTimer) clearTimeout(consultationDebounceTimer);
+    consultationDebounceTimer = setTimeout(() => {
+      processConsultationPageCalls();
+    }, 300);
+  }
+
   function startConsultationObserver() {
     if (document.body && document.body instanceof Node) {
       if (consultationObserver) consultationObserver.disconnect();
-      consultationObserver = new MutationObserver(() => {
-        processConsultationPageCalls();
+      consultationObserver = new MutationObserver((mutations) => {
+        const isSelfMutation = mutations.every((m) => {
+          const t = m.target;
+          return (
+            t &&
+            (t.id === "gofleet-scan-security-badge" ||
+              t.id === "gofleet-scan-security-badge-wrapper" ||
+              (t.closest &&
+                (t.closest("#gofleet-scan-security-badge") ||
+                  t.closest("#gofleet-scan-security-badge-wrapper"))) ||
+              t.id === "gofleet-gmh-security-badge" ||
+              t.id === "gofleet-gmh-security-badge-wrapper" ||
+              (t.closest &&
+                (t.closest("#gofleet-gmh-security-badge") ||
+                  t.closest("#gofleet-gmh-security-badge-wrapper"))) ||
+              t.id === "gof-colis-counter" ||
+              (t.closest && t.closest("#gof-colis-counter")) ||
+              (t.classList && t.classList.contains("gof-colis-enhancement")) ||
+              (t.closest && t.closest(".gof-colis-enhancement")))
+          );
+        });
+        if (!isSelfMutation) {
+          debouncedProcessConsultationCalls();
+        }
       });
 
       consultationObserver.observe(document.body, { childList: true, subtree: true });
-      processConsultationPageCalls();
-      setTimeout(processConsultationPageCalls, 1000);
-      setTimeout(processConsultationPageCalls, 2500);
+      debouncedProcessConsultationCalls();
+      setTimeout(debouncedProcessConsultationCalls, 1200);
     } else {
       setTimeout(startConsultationObserver, 200);
     }
@@ -3445,6 +3489,85 @@ if (
   );
 
   // 5. Visual Security Badge
+  let lastBadgeCount = -1;
+
+  function mountBadgeSafely(badge, input) {
+    // 1. If "Grouper les colis" switch is on the page, mount the badge next to it on Row 1
+    const grouperEl = Array.from(
+      document.querySelectorAll("label, span, div, p, .checkbox, .switch")
+    ).find(
+      (el) =>
+        el.children.length <= 1 &&
+        /grouper\s*les\s*colis/i.test(el.textContent || "")
+    );
+
+    if (grouperEl) {
+      const switchContainer =
+        grouperEl.closest(".switch, .checkbox, .custom-control, .form-check, label") ||
+        grouperEl;
+
+      const parent = switchContainer.parentElement;
+      if (parent) {
+        // If badge was inside a wrapper, remove the empty wrapper
+        const oldWrapper = document.getElementById("gofleet-scan-security-badge-wrapper");
+        if (oldWrapper && oldWrapper !== badge && oldWrapper.parentElement) {
+          oldWrapper.remove();
+        }
+
+        Object.assign(badge.style, {
+          marginLeft: "16px",
+          display: "inline-flex",
+          verticalAlign: "middle"
+        });
+
+        try {
+          const computedDisplay = window.getComputedStyle(parent).display;
+          if (computedDisplay.includes("flex")) {
+            parent.style.alignItems = "center";
+            parent.style.flexWrap = "wrap";
+          }
+        } catch (e) {}
+
+        if (switchContainer.nextElementSibling !== badge) {
+          parent.insertBefore(badge, switchContainer.nextElementSibling);
+        }
+        return;
+      }
+    }
+
+    // 2. Fallback: mount on its own row ABOVE the outer input container / form-group
+    let wrapper = document.getElementById("gofleet-scan-security-badge-wrapper");
+    if (!wrapper) {
+      wrapper = document.createElement("div");
+      wrapper.id = "gofleet-scan-security-badge-wrapper";
+      Object.assign(wrapper.style, {
+        display: "block",
+        width: "100%",
+        marginBottom: "8px",
+        marginTop: "4px",
+        clear: "both",
+        flexBasis: "100%"
+      });
+    }
+
+    if (!wrapper.contains(badge)) {
+      badge.style.marginLeft = "0";
+      wrapper.appendChild(badge);
+    }
+
+    const outerContainer =
+      input.closest(".form-group, .row, .col, [class*='col-'], .card-toolbar, form") ||
+      input.parentElement;
+
+    if (outerContainer && outerContainer.parentElement && outerContainer !== document.body) {
+      if (wrapper.parentElement !== outerContainer.parentElement || wrapper.nextElementSibling !== outerContainer) {
+        outerContainer.parentElement.insertBefore(wrapper, outerContainer);
+      }
+    } else if (input.parentElement) {
+      input.parentElement.insertBefore(wrapper, input);
+    }
+  }
+
   function updateSecurityBadge() {
     if (!isTraitementPage()) return;
     const input = findScanInput();
@@ -3454,6 +3577,16 @@ if (
     const count = document.querySelectorAll(
       ".js-colis-data, .js-colis-details-row, [data-colinum]"
     ).length;
+
+    const isProperlyMounted =
+      badge &&
+      document.body.contains(badge) &&
+      !input.parentElement.contains(badge);
+
+    if (isProperlyMounted && count === lastBadgeCount) {
+      return;
+    }
+    lastBadgeCount = count;
 
     if (!badge) {
       badge = document.createElement("div");
@@ -3467,36 +3600,62 @@ if (
         color: "#065f46",
         backgroundColor: "#d1fae5",
         border: "1px solid #a7f3d0",
-        padding: "4px 10px",
+        padding: "4px 12px",
         borderRadius: "20px",
-        margin: "6px 0",
         width: "fit-content",
+        boxShadow: "0 1px 2px rgba(0,0,0,0.05)",
         transition: "all 0.3s ease"
       });
+    }
 
-      const parent = input.parentElement;
-      if (parent) {
-        parent.insertBefore(badge, input);
-      }
+    const newHtml =
+      count > 0
+        ? `🛡️ <strong>Scan Sécurisé :</strong> ${count} colis autorisés sur cette page`
+        : `🛡️ <strong>Scan Sécurisé :</strong> En attente de détection des colis...`;
+
+    if (badge.innerHTML !== newHtml) {
+      badge.innerHTML = newHtml;
     }
 
     if (count > 0) {
-      badge.innerHTML = `🛡️ <strong>Scan Sécurisé :</strong> ${count} colis autorisés sur cette page`;
       badge.style.backgroundColor = "#d1fae5";
       badge.style.color = "#065f46";
       badge.style.borderColor = "#a7f3d0";
     } else {
-      badge.innerHTML = `🛡️ <strong>Scan Sécurisé :</strong> En attente de détection des colis...`;
       badge.style.backgroundColor = "#fef3c7";
       badge.style.color = "#92400e";
       badge.style.borderColor = "#fde68a";
     }
+
+    mountBadgeSafely(badge, input);
+  }
+
+  let badgeUpdateTimeout = null;
+  function debouncedUpdateSecurityBadge() {
+    if (badgeUpdateTimeout) clearTimeout(badgeUpdateTimeout);
+    badgeUpdateTimeout = setTimeout(() => {
+      if (isTraitementPage()) {
+        updateSecurityBadge();
+      }
+    }, 250);
   }
 
   if (document.body && document.body instanceof Node) {
-    const observer = new MutationObserver(() => {
-      if (isTraitementPage()) {
-        updateSecurityBadge();
+    const observer = new MutationObserver((mutations) => {
+      if (!isTraitementPage()) return;
+      const isSelfMutation = mutations.every((m) => {
+        const t = m.target;
+        return (
+          t &&
+          (t.id === "gofleet-scan-security-badge" ||
+            t.id === "gofleet-scan-security-badge-wrapper" ||
+            (t.closest &&
+              (t.closest("#gofleet-scan-security-badge") ||
+                t.closest("#gofleet-scan-security-badge-wrapper"))))
+        );
+      });
+      if (!isSelfMutation) {
+        debouncedUpdateSecurityBadge();
       }
     });
     observer.observe(document.body, { childList: true, subtree: true });
@@ -3916,12 +4075,54 @@ if (
   );
 
   // 5. Visual Security Badge
+  function mountGmhBadgeSafely(badge, input) {
+    let wrapper = document.getElementById("gofleet-gmh-security-badge-wrapper");
+    if (!wrapper) {
+      wrapper = document.createElement("div");
+      wrapper.id = "gofleet-gmh-security-badge-wrapper";
+      Object.assign(wrapper.style, {
+        display: "block",
+        width: "100%",
+        marginBottom: "8px",
+        marginTop: "4px",
+        clear: "both",
+        flexBasis: "100%"
+      });
+    }
+
+    if (!wrapper.contains(badge)) {
+      wrapper.appendChild(badge);
+    }
+
+    const outerContainer =
+      input.closest(".form-group, .row, .col, [class*='col-'], .card-toolbar, form") ||
+      input.parentElement;
+
+    if (outerContainer && outerContainer.parentElement && outerContainer !== document.body) {
+      if (wrapper.parentElement !== outerContainer.parentElement || wrapper.nextElementSibling !== outerContainer) {
+        outerContainer.parentElement.insertBefore(wrapper, outerContainer);
+      }
+    } else if (input.parentElement) {
+      input.parentElement.insertBefore(wrapper, input);
+    }
+  }
+
   function updateGmhSecurityBadge() {
     if (!isGmhFilterPage()) return;
     const input = findScanInput();
     if (!input) return;
 
     let badge = document.getElementById("gofleet-gmh-security-badge");
+    let wrapper = document.getElementById("gofleet-gmh-security-badge-wrapper");
+    const isProperlyMounted =
+      badge &&
+      document.body.contains(badge) &&
+      !input.parentElement.contains(badge);
+
+    if (isProperlyMounted && wrapper && document.body.contains(wrapper)) {
+      return;
+    }
+
     if (!badge) {
       badge = document.createElement("div");
       badge.id = "gofleet-gmh-security-badge";
@@ -3934,26 +4135,44 @@ if (
         color: "#1e40af",
         backgroundColor: "#dbeafe",
         border: "1px solid #bfdbfe",
-        padding: "4px 10px",
+        padding: "4px 12px",
         borderRadius: "20px",
-        margin: "6px 0",
         width: "fit-content",
+        boxShadow: "0 1px 2px rgba(0,0,0,0.05)",
         transition: "all 0.3s ease"
       });
-
-      const parent = input.parentElement;
-      if (parent) {
-        parent.insertBefore(badge, input);
-      }
+      badge.innerHTML = `🛡️ <strong>Scan Filtré :</strong> Colis GMH & Retours uniquement`;
     }
 
-    badge.innerHTML = `🛡️ <strong>Scan Filtré :</strong> Colis GMH & Retours uniquement`;
+    mountGmhBadgeSafely(badge, input);
+  }
+
+  let gmhBadgeTimeout = null;
+  function debouncedUpdateGmhSecurityBadge() {
+    if (gmhBadgeTimeout) clearTimeout(gmhBadgeTimeout);
+    gmhBadgeTimeout = setTimeout(() => {
+      if (isGmhFilterPage()) {
+        updateGmhSecurityBadge();
+      }
+    }, 250);
   }
 
   if (document.body && document.body instanceof Node) {
-    const observer = new MutationObserver(() => {
-      if (isGmhFilterPage()) {
-        updateGmhSecurityBadge();
+    const observer = new MutationObserver((mutations) => {
+      if (!isGmhFilterPage()) return;
+      const isSelfMutation = mutations.every((m) => {
+        const t = m.target;
+        return (
+          t &&
+          (t.id === "gofleet-gmh-security-badge" ||
+            t.id === "gofleet-gmh-security-badge-wrapper" ||
+            (t.closest &&
+              (t.closest("#gofleet-gmh-security-badge") ||
+                t.closest("#gofleet-gmh-security-badge-wrapper"))))
+        );
+      });
+      if (!isSelfMutation) {
+        debouncedUpdateGmhSecurityBadge();
       }
     });
     observer.observe(document.body, { childList: true, subtree: true });
