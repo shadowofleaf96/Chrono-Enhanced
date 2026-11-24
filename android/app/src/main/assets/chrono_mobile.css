@@ -604,26 +604,55 @@ div:not(header *):not([class*="navbar-"] *):not([class*="filterGroupToolsRight-"
 .ant-picker-dropdown,
 .ant-popover,
 .ant-tooltip {
-  z-index: 2500 !important;
+  z-index: 30000 !important;
+}
+
+[class*="filterRow-"]:has([class*="filter-menu"]:not([style*="display: none"])),
+[class*="filterRow-"]:has([class*="menuItemLayout"]),
+[class*="filterRow-"]:has(.ant-dropdown:not(.ant-dropdown-hidden)),
+[class*="filterRow-"]:has(.filter-menu),
+[class*="filterRow-"]:has([style*="display: block"]),
+[class*="filterRow-"]:focus-within {
+  z-index: 10000 !important;
+}
+
+[class*="multiSelectFilter-"]:has([class*="filter-menu"]:not([style*="display: none"])),
+[class*="multiSelectFilter-"]:has([class*="menuItemLayout"]),
+[class*="multiSelectFilter-"]:focus-within {
+  z-index: 10001 !important;
 }
 
 .ant-form-item:has(.filter-menu),
 .ant-form-item:has([class*="filter-menu"]),
-[class*="multiSelectFilter-"]:has(.filter-menu),
-[class*="multiSelectFilter-"]:has([class*="filter-menu"]),
 div:has(> .filter-menu),
 div:has(> [class*="filter-menu"]) {
-  z-index: 1000 !important;
+  z-index: 10000 !important;
   position: relative !important;
 }
 
-[class*="filterRow-"],
+[class*="filterRow-"] {
+  position: relative !important;
+  z-index: auto !important;
+  overflow: visible !important;
+}
+
 [class*="containerDefaultFilter-"],
 [class*="formContainer-"],
 [class*="multiSelectFilter-"] {
   position: relative !important;
   z-index: 25 !important;
   overflow: visible !important;
+}
+
+/* Ensure View Rider Transactions and action buttons stay in background layer under dropdowns */
+a[href*="transactionsHistory"],
+a:has(> [class*="transaction"]),
+div:has(> a[href*="transactionsHistory"]),
+[class*="transactionLink-"],
+.chrono-ext-recon-settlements-btn,
+.chrono-ext-verify-btn {
+  position: relative !important;
+  z-index: 1 !important;
 }
 
 [class*="formContainer-"] .ant-form-item {
@@ -1799,6 +1828,22 @@ html, body {
   min-width: 40px !important;
 }
 
+.ant-modal .ant-input-suffix {
+  min-width: 44px !important;
+  min-height: 44px !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  cursor: pointer !important;
+  touch-action: manipulation !important;
+}
+
+.ant-modal .ant-input-suffix svg {
+  width: 22px !important;
+  height: 22px !important;
+  color: #0088ce !important;
+}
+
 /* Import Excel Button in Modals */
 .ant-modal .chrono-ext-import-btn {
   width: 100% !important;
@@ -1881,28 +1926,250 @@ div[class*="widget-visible"],
   display: none !important;
 }
 
-/* ── 13. Extension Widgets on Mobile ───────────────────────────────────────── */
-.chrono-status-widget {
-  width: 96vw !important;
-  max-width: 96vw !important;
-  left: 2vw !important;
-  right: 2vw !important;
-  bottom: 12px !important;
-  border-radius: 12px !important;
-  box-shadow: 0 8px 24px rgba(0,0,0,0.2) !important;
-}
-
 .chrono-ext-status-badge {
   font-size: 11px !important;
   padding: 2px 6px !important;
-  max-width: 140px !important;
+}
+
+.chrono-ext-cn-cell {
+  display: flex !important;
+  flex-direction: column !important;
+  align-items: stretch !important;
+  gap: 2px !important;
+  width: 100% !important;
+  padding: 4px 6px !important;
+  box-sizing: border-box !important;
+}
+
+.chrono-cn-header {
+  display: flex !important;
+  justify-content: space-between !important;
+  align-items: center !important;
+  width: 100% !important;
+  gap: 6px !important;
+  padding-bottom: 1px !important;
+}
+
+.chrono-cn-code {
+  font-weight: 700 !important;
+  font-size: 13.5px !important;
+  color: #0f172a !important;
+  letter-spacing: 0.3px !important;
+}
+
+.chrono-cn-badges {
+  display: flex !important;
+  align-items: center !important;
+  gap: 4px !important;
+  margin-left: auto !important;
+}
+
+.chrono-ext-status-container {
+  width: 100% !important;
+  box-sizing: border-box !important;
 }
 
 .chrono-ext-status-timeline {
-  flex-wrap: nowrap !important;
-  overflow-x: auto !important;
+  display: flex !important;
+  flex-direction: column !important;
+  align-items: stretch !important;
+  width: 100% !important;
+  max-width: 100% !important;
+  background: #f8fafc !important;
+  border: 1px solid #e2e8f0 !important;
+  border-radius: 6px !important;
+  padding: 3px 6px !important;
+  box-sizing: border-box !important;
+}
+
+.chrono-ext-status-timeline.is-single-line {
+  padding: 3px 6px !important;
+}
+
+.chrono-ext-status-line {
+  display: flex !important;
+  align-items: center !important;
   gap: 6px !important;
-  max-width: 240px !important;
+  width: 100% !important;
+  font-size: 12px !important;
+  line-height: 1.25 !important;
+  overflow: hidden !important;
+}
+
+.chrono-ext-attempts-badge {
+  display: inline-flex !important;
+  align-items: center !important;
+  background: #fee2e2 !important;
+  color: #b91c1c !important;
+  border: 1px solid #fca5a5 !important;
+  border-radius: 4px !important;
+  font-size: 10.5px !important;
+  font-weight: 600 !important;
+  padding: 1px 6px !important;
+}
+
+.chrono-ext-cod-badge {
+  display: inline-flex !important;
+  align-items: center !important;
+  background: #ecfdf5 !important;
+  color: #047857 !important;
+  border: 1px solid #a7f3d0 !important;
+  border-radius: 4px !important;
+  font-size: 10.5px !important;
+  font-weight: 600 !important;
+  padding: 1px 6px !important;
+}
+
+.chrono-ext-log-dot {
+  display: inline-block !important;
+  width: 7px !important;
+  height: 7px !important;
+  min-width: 7px !important;
+  border-radius: 50% !important;
+  flex-shrink: 0 !important;
+  box-shadow: 0 0 0 1.5px rgba(255,255,255,0.9) !important;
+}
+
+.chrono-ext-log-status {
+  font-size: 12.5px !important;
+  font-weight: 700 !important;
+  color: #1e293b !important;
+  white-space: nowrap !important;
+  flex-shrink: 0 !important;
+}
+
+.chrono-ext-log-status.is-current {
+  color: #0f172a !important;
+}
+
+.chrono-ext-log-detail-inline {
+  font-size: 11px !important;
+  color: #64748b !important;
+  white-space: nowrap !important;
+  overflow: hidden !important;
+  text-overflow: ellipsis !important;
+  flex: 1 1 auto !important;
+  min-width: 0 !important;
+}
+
+.chrono-ext-log-time {
+  font-size: 10.5px !important;
+  font-weight: 600 !important;
+  color: #475569 !important;
+  background: #e2e8f0 !important;
+  padding: 1px 5px !important;
+  border-radius: 4px !important;
+  white-space: nowrap !important;
+  margin-left: auto !important;
+  flex-shrink: 0 !important;
+}
+
+.chrono-ext-history-btn {
+  background: #e2e8f0 !important;
+  color: #475569 !important;
+  border: 1px solid #cbd5e1 !important;
+  border-radius: 4px !important;
+  font-size: 10px !important;
+  font-weight: 700 !important;
+  padding: 1px 5px !important;
+  cursor: pointer !important;
+  flex-shrink: 0 !important;
+  line-height: 14px !important;
+}
+
+.chrono-ext-history-btn:hover {
+  background: #cbd5e1 !important;
+}
+
+.chrono-ext-history-dropdown {
+  margin-top: 4px !important;
+  padding-top: 4px !important;
+  border-top: 1px dashed #cbd5e1 !important;
+  display: flex !important;
+  flex-direction: column !important;
+  gap: 3px !important;
+}
+
+.chrono-ext-history-item {
+  display: flex !important;
+  align-items: center !important;
+  gap: 6px !important;
+  font-size: 11px !important;
+  color: #64748b !important;
+}
+
+.chrono-ext-log-entry {
+  display: flex !important;
+  align-items: flex-start !important;
+  gap: 8px !important;
+  width: 100% !important;
+  padding: 4px 0 !important;
+}
+
+.chrono-ext-log-entry:not(:last-child) {
+  border-bottom: 1px dashed #e2e8f0 !important;
+  padding-bottom: 6px !important;
+  margin-bottom: 2px !important;
+}
+
+.chrono-ext-log-entry::after {
+  display: none !important;
+}
+
+.chrono-ext-log-dot {
+  display: inline-block !important;
+  width: 10px !important;
+  height: 10px !important;
+  border-radius: 50% !important;
+  margin-top: 4px !important;
+  flex-shrink: 0 !important;
+  box-shadow: 0 0 0 2px rgba(255,255,255,0.8) !important;
+}
+
+.chrono-ext-log-content {
+  display: flex !important;
+  flex-direction: column !important;
+  flex: 1 1 auto !important;
+  min-width: 0 !important;
+}
+
+.chrono-ext-log-title-row {
+  display: flex !important;
+  justify-content: space-between !important;
+  align-items: center !important;
+  width: 100% !important;
+  gap: 8px !important;
+}
+
+.chrono-ext-log-status {
+  font-size: 13px !important;
+  font-weight: 600 !important;
+  color: #1e293b !important;
+  line-height: 1.3 !important;
+  white-space: normal !important;
+  word-break: break-word !important;
+}
+
+.chrono-ext-log-status.is-current {
+  color: #0f172a !important;
+  font-size: 13.5px !important;
+}
+
+.chrono-ext-log-time {
+  font-size: 11px !important;
+  font-weight: 600 !important;
+  color: #475569 !important;
+  background: #e2e8f0 !important;
+  padding: 2px 6px !important;
+  border-radius: 4px !important;
+  white-space: nowrap !important;
+}
+
+.chrono-ext-log-detail {
+  font-size: 11.5px !important;
+  color: #475569 !important;
+  margin-top: 3px !important;
+  line-height: 1.35 !important;
 }
 
 .chrono-ext-import-btn {
@@ -2037,4 +2304,155 @@ div[class*="widget-visible"],
   transition: opacity 0.2s ease !important;
   background: transparent !important;
 }
+
+/* ── 16. Consignment Details & Chosen Trip in Trip Manager Responsive ────────── */
+
+/* Consignment Details & Chosen Trip Card Grids */
+[class*="rowContainer-"] .ant-row,
+[class*="tabsCardsContainer-"] .ant-row,
+.ant-card .ant-row {
+  display: flex !important;
+  flex-wrap: wrap !important;
+  row-gap: 8px !important;
+  margin-left: 0 !important;
+  margin-right: 0 !important;
+}
+
+[class*="rowContainer-"] .ant-col,
+[class*="tabsCardsContainer-"] .ant-col,
+.ant-card .ant-col {
+  padding: 4px 6px !important;
+  box-sizing: border-box !important;
+  word-break: normal !important;
+  overflow-wrap: break-word !important;
+}
+
+/* 4-column into 2 clean columns on mobile */
+[class*="rowContainer-"] .ant-col-6,
+[class*="rowContainer-"] .ant-col-8,
+[class*="tabsCardsContainer-"] .ant-col-6,
+[class*="tabsCardsContainer-"] .ant-col-8,
+.ant-card .ant-col-6,
+.ant-card .ant-col-8 {
+  flex: 0 0 50% !important;
+  max-width: 50% !important;
+  width: 50% !important;
+}
+
+/* Full width for addresses, descriptions, and wide fields */
+[class*="rowContainer-"] .ant-col-12,
+[class*="rowContainer-"] .ant-col-16,
+[class*="rowContainer-"] .ant-col-24,
+[class*="tabsCardsContainer-"] .ant-col-12,
+[class*="tabsCardsContainer-"] .ant-col-16,
+[class*="tabsCardsContainer-"] .ant-col-24,
+.ant-card .ant-col-12,
+.ant-card .ant-col-16,
+.ant-card .ant-col-24 {
+  flex: 0 0 100% !important;
+  max-width: 100% !important;
+  width: 100% !important;
+}
+
+[class*="rowContainer-"] {
+  width: 100% !important;
+  box-sizing: border-box !important;
+  padding: 8px !important;
+  background: #ffffff !important;
+  border-radius: 10px !important;
+  border: 1px solid #e2e8f0 !important;
+  margin-bottom: 10px !important;
+}
+
+/* Chosen Trip Manager Stats Card (itemsWrapper) */
+[class*="itemsWrapper-"] {
+  display: grid !important;
+  grid-template-columns: repeat(2, 1fr) !important;
+  gap: 8px !important;
+  width: 100% !important;
+  box-sizing: border-box !important;
+  padding: 4px !important;
+}
+
+[class*="itemsWrapper-"] > [class*="item-"] {
+  width: 100% !important;
+  max-width: 100% !important;
+  box-sizing: border-box !important;
+  padding: 6px 10px !important;
+  background: #f8fafc !important;
+  border-radius: 8px !important;
+  border: 1px solid #e2e8f0 !important;
+  margin: 0 !important;
+}
+
+[class*="itemsWrapper-"] > [class*="item-"] span:first-child,
+[class*="itemsWrapper-"] > [class*="item-"] div:first-child {
+  font-size: 11px !important;
+  color: #64748b !important;
+  font-weight: 500 !important;
+  text-transform: uppercase !important;
+  letter-spacing: 0.3px !important;
+}
+
+[class*="itemsWrapper-"] > [class*="item-"] span:last-child,
+[class*="itemsWrapper-"] > [class*="item-"] div:last-child {
+  font-size: 13px !important;
+  color: #0f172a !important;
+  font-weight: 700 !important;
+}
+
+/* Trip Details & Consignment Details Tabs & Header Actions Wrapping */
+[class*="tableContainer-"] .ant-tabs-nav,
+.ant-tabs-top > .ant-tabs-nav,
+[class*="tabsCardsContainer-"] .ant-tabs-nav {
+  display: flex !important;
+  flex-direction: column !important;
+  align-items: stretch !important;
+  width: 100% !important;
+  margin-bottom: 8px !important;
+}
+
+.ant-tabs-nav-wrap {
+  width: 100% !important;
+  max-width: 100vw !important;
+  overflow-x: auto !important;
+  -webkit-overflow-scrolling: touch !important;
+  padding-bottom: 4px !important;
+}
+
+.ant-tabs-nav-list {
+  display: flex !important;
+  flex-wrap: nowrap !important;
+  gap: 6px !important;
+}
+
+.ant-tabs-tab {
+  min-height: 38px !important;
+  padding: 6px 14px !important;
+  font-size: 13px !important;
+  font-weight: 600 !important;
+  border-radius: 20px !important;
+  white-space: nowrap !important;
+  touch-action: manipulation !important;
+}
+
+.ant-tabs-extra-content {
+  width: 100% !important;
+  display: flex !important;
+  flex-wrap: wrap !important;
+  align-items: center !important;
+  justify-content: space-between !important;
+  gap: 8px !important;
+  margin-top: 6px !important;
+  padding: 2px 4px !important;
+}
+
+.ant-tabs-extra-content input,
+.ant-tabs-extra-content .ant-input-search {
+  max-width: 100% !important;
+  flex: 1 1 180px !important;
+  height: 38px !important;
+  border-radius: 8px !important;
+}
+
 

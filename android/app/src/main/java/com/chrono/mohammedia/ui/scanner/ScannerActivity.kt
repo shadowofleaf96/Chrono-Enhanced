@@ -1,13 +1,19 @@
 package com.chrono.mohammedia.ui.scanner
 
+import android.Manifest
 import android.app.Activity
 import android.content.Context
 import android.content.Intent
+import android.content.pm.PackageManager
 import android.media.AudioManager
 import android.media.ToneGenerator
 import android.os.Bundle
 import android.view.View
+import android.widget.Toast
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.appcompat.app.AppCompatActivity
+import androidx.camera.view.PreviewView
+import androidx.core.content.ContextCompat
 import com.chrono.mohammedia.databinding.ActivityScannerBinding
 
 class ScannerActivity : AppCompatActivity() {
@@ -20,6 +26,17 @@ class ScannerActivity : AppCompatActivity() {
     private var expectedCodesSet: Set<String>? = null
     
     private var toneGenerator: ToneGenerator? = null
+
+    private val cameraPermissionLauncher = registerForActivityResult(
+        ActivityResultContracts.RequestPermission()
+    ) { isGranted ->
+        if (isGranted) {
+            startCameraSafely()
+        } else {
+            Toast.makeText(this, "Permission caméra requise pour le scanner", Toast.LENGTH_LONG).show()
+            finish()
+        }
+    }
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -72,6 +89,16 @@ class ScannerActivity : AppCompatActivity() {
             scannerHelper?.toggleTorch()
         }
 
+        binding.cameraPreview.implementationMode = PreviewView.ImplementationMode.COMPATIBLE
+
+        if (ContextCompat.checkSelfPermission(this, Manifest.permission.CAMERA) == PackageManager.PERMISSION_GRANTED) {
+            startCameraSafely()
+        } else {
+            cameraPermissionLauncher.launch(Manifest.permission.CAMERA)
+        }
+    }
+
+    private fun startCameraSafely() {
         scannerHelper?.startCamera(this, binding.cameraPreview)
     }
 

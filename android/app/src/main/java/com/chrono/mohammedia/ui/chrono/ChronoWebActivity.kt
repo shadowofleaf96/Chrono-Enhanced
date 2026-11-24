@@ -1,14 +1,17 @@
 package com.chrono.mohammedia.ui.chrono
 
+import android.Manifest
 import android.annotation.SuppressLint
 import android.app.Activity
 import android.app.DownloadManager
 import android.content.Context
 import android.content.Intent
+import android.content.pm.PackageManager
 import android.graphics.Bitmap
 import android.net.Uri
 import android.os.Bundle
 import android.os.Environment
+import android.os.Message
 import android.text.Editable
 import android.text.TextWatcher
 import android.util.Base64
@@ -20,6 +23,7 @@ import android.webkit.*
 import android.widget.Toast
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.appcompat.app.AppCompatActivity
+import androidx.core.content.ContextCompat
 import com.chrono.mohammedia.R
 import com.chrono.mohammedia.databinding.ActivityChronoWebBinding
 import com.chrono.mohammedia.ui.portal.PortalSelectorActivity
@@ -37,6 +41,26 @@ class ChronoWebActivity : AppCompatActivity() {
     private var cachedMobileResponsiveCss: String? = null
 
     private var filePathCallback: ValueCallback<Array<Uri>>? = null
+    private var pendingPermissionRequest: PermissionRequest? = null
+    private var pendingLaunchScanner: Boolean = false
+
+    private val cameraPermissionLauncher = registerForActivityResult(
+        ActivityResultContracts.RequestPermission()
+    ) { isGranted ->
+        if (isGranted) {
+            pendingPermissionRequest?.grant(pendingPermissionRequest?.resources)
+            if (pendingLaunchScanner) {
+                pendingLaunchScanner = false
+                val intent = Intent(this, ScannerActivity::class.java)
+                scannerLauncher.launch(intent)
+            }
+        } else {
+            pendingPermissionRequest?.deny()
+            pendingLaunchScanner = false
+            Toast.makeText(this, "Permission caméra requise pour le scanner", Toast.LENGTH_SHORT).show()
+        }
+        pendingPermissionRequest = null
+    }
 
     private val fileChooserLauncher = registerForActivityResult(
         ActivityResultContracts.StartActivityForResult()
@@ -182,6 +206,7 @@ class ChronoWebActivity : AppCompatActivity() {
             setSupportZoom(true)
             builtInZoomControls = false
             displayZoomControls = false
+            setSupportMultipleWindows(true)
             loadWithOverviewMode = true
             useWideViewPort = true
             mixedContentMode = WebSettings.MIXED_CONTENT_ALWAYS_ALLOW
@@ -192,6 +217,18 @@ class ChronoWebActivity : AppCompatActivity() {
         wv.addJavascriptInterface(ChronoJsBridge(), "AndroidApp")
 
         wv.webChromeClient = object : WebChromeClient() {
+            override fun onCreateWindow(
+                view: WebView?,
+                isDialog: Boolean,
+                isUserGesture: Boolean,
+                resultMsg: Message?
+            ): Boolean {
+                val transport = resultMsg?.obj as? WebView.WebViewTransport
+                transport?.webView = view
+                resultMsg?.sendToTarget()
+                return true
+            }
+
             override fun onReceivedTitle(view: WebView?, title: String?) {
                 super.onReceivedTitle(view, title)
                 if (!title.isNullOrBlank() &&
@@ -211,7 +248,17 @@ class ChronoWebActivity : AppCompatActivity() {
             }
 
             override fun onPermissionRequest(request: PermissionRequest) {
-                request.grant(request.resources)
+                val isCameraRequested = request.resources.any { it == PermissionRequest.RESOURCE_VIDEO_CAPTURE }
+                if (isCameraRequested) {
+                    if (ContextCompat.checkSelfPermission(this@ChronoWebActivity, Manifest.permission.CAMERA) == PackageManager.PERMISSION_GRANTED) {
+                        request.grant(request.resources)
+                    } else {
+                        pendingPermissionRequest = request
+                        cameraPermissionLauncher.launch(Manifest.permission.CAMERA)
+                    }
+                } else {
+                    request.grant(request.resources)
+                }
             }
 
             override fun onShowFileChooser(
@@ -360,32 +407,71 @@ class ChronoWebActivity : AppCompatActivity() {
     // ── Scanner integration ───────────────────────────────────────────────────
 
     private fun launchBarcodeScanner() {
-        val intent = Intent(this, ScannerActivity::class.java)
-        scannerLauncher.launch(intent)
+        if (ContextCompat.checkSelfPermission(this, Manifest.permission.CAMERA) == PackageManager.PERMISSION_GRANTED) {
+            val intent = Intent(this, ScannerActivity::class.java)
+            scannerLauncher.launch(intent)
+        } else {
+            pendingLaunchScanner = true
+            cameraPermissionLauncher.launch(Manifest.permission.CAMERA)
+        }
     }
 
     private fun injectScannedBarcode(code: String) {
         val escaped = code.replace("'", "\\'")
         val js = """
             (function() {
-                // Try to fill the active/focused input, or the last scan input
-                var active = document.activeElement;
-                if (active && (active.tagName === 'INPUT' || active.tagName === 'TEXTAREA')) {
-                    active.value = '$escaped';
-                    active.dispatchEvent(new Event('input', { bubbles: true }));
-                    active.dispatchEvent(new Event('change', { bubbles: true }));
-                    return;
+                function findInput(doc) {
+                    if (!doc) return null;
+                    var active = doc.activeElement;
+                    if (active && (active.tagName === 'INPUT' || active.tagName === 'TEXTAREA') && active.type !== 'hidden') {
+                        return active;
+                    }
+                    var modal = doc.querySelector('.ant-modal-content');
+                    if (modal) {
+                        var modalInp = modal.querySelector('input[placeholder*="CN" i], input[placeholder*="consign" i], input[placeholder*="Scan" i], input[placeholder*="AWB" i], input[placeholder*="Bag" i], input[placeholder*="Run" i], input[placeholder*="Manifest" i], input[placeholder*="Waybill" i], input.ant-input:not([type="hidden"])');
+                        if (modalInp) return modalInp;
+                    }
+                    return doc.querySelector('input[placeholder*="CN" i], input[placeholder*="consign" i], input[placeholder*="Scan" i], input[placeholder*="AWB" i], input[placeholder*="colis" i], input[type="search"]');
                 }
-                // Fallback: look for a scan input field (common patterns in Chrono SPA)
-                var inputs = document.querySelectorAll('input[placeholder*="scan"], input[placeholder*="Scan"], input[placeholder*="CN"], input[placeholder*="colis"], input[type="search"]');
-                if (inputs.length > 0) {
-                    var inp = inputs[0];
+
+                var targetDoc = document;
+                var iframe = document.querySelector('#chrono-inscan-iframe');
+                if (iframe && iframe.contentDocument) {
+                    var iframeInp = findInput(iframe.contentDocument);
+                    if (iframeInp) {
+                        targetDoc = iframe.contentDocument;
+                    }
+                }
+
+                var inp = findInput(targetDoc);
+                if (inp) {
                     inp.focus();
-                    inp.value = '$escaped';
+                    var targetWin = targetDoc.defaultView || window;
+                    var proto = (targetWin.HTMLInputElement && targetWin.HTMLInputElement.prototype) || window.HTMLInputElement.prototype;
+                    var nativeSetter = Object.getOwnPropertyDescriptor(proto, 'value') ? Object.getOwnPropertyDescriptor(proto, 'value').set : null;
+                    if (nativeSetter) {
+                        nativeSetter.call(inp, '$escaped');
+                    } else {
+                        inp.value = '$escaped';
+                    }
                     inp.dispatchEvent(new Event('input', { bubbles: true }));
                     inp.dispatchEvent(new Event('change', { bubbles: true }));
+
+                    ['keydown', 'keypress', 'keyup'].forEach(function(evtType) {
+                        inp.dispatchEvent(new KeyboardEvent(evtType, {
+                            key: 'Enter',
+                            code: 'Enter',
+                            keyCode: 13,
+                            which: 13,
+                            bubbles: true,
+                            cancelable: true
+                        }));
+                    });
                 }
-                if (window.AndroidApp) window.AndroidApp.showToast('Code scanné: $escaped');
+
+                if (window.AndroidApp && typeof window.AndroidApp.showToast === 'function') {
+                    window.AndroidApp.showToast('Code scanné: $escaped');
+                }
             })();
         """.trimIndent()
         binding.webviewChrono.evaluateJavascript(js, null)

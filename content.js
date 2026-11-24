@@ -161,6 +161,7 @@
 
       const entries = [];
       entries.attempts = attemptCount;
+      entries.codAmount = dataObj.cod_amount || (dataObj.data && dataObj.data.cod_amount) || "";
 
       for (let i = 0; i < Math.min(events.length, LOG_ENTRIES_COUNT); i++) {
         const ev = events[i];
@@ -175,7 +176,10 @@
         }
         
         entries.push({
-          status: status.substring(0, 50),
+          status: status,
+          reason: ev.reason || (ev.details && ev.details.reason) || "",
+          hub: ev.hub_name || "",
+          worker: ev.worker_name || ev.rider_name || (ev.details && ev.details.worker_name) || "",
           fullStatus: fullStatus,
           color: getStatusColor(ev.type),
           time: formatTime(ev.event_time)
@@ -213,85 +217,158 @@
   }
 
   /**
-   * Build a mini-timeline showing up to 3 recent log entries.
-   * @param {Array<{status, color, time}>} entries
+   * Build a single-line status row with inline details and expandable history.
+   * @param {Array<{status, color, time, reason, worker, hub}>} entries
+   * @param {HTMLElement|null} cnHeader - optional header to host attempt/COD badges
    */
-  function createStatusTimeline(entries) {
-    const container = document.createElement("div");
-    container.className = "chrono-ext-status-timeline";
-    
-    if (entries.attempts && entries.attempts !== '0') {
-      const attemptsBadge = document.createElement("div");
-      attemptsBadge.className = "chrono-ext-attempts-badge";
-      attemptsBadge.innerHTML = `Attempts: <strong>${entries.attempts}</strong>`;
-      container.appendChild(attemptsBadge);
-    }
+  function createStatusTimeline(entries, cnHeader = null) {
+    // If cnHeader is provided, place attempt/COD badges inline in the header to save vertical space
+    if (cnHeader && entries) {
+      let badgesContainer = cnHeader.querySelector(".chrono-cn-badges");
+      if (!badgesContainer) {
+        badgesContainer = document.createElement("div");
+        badgesContainer.className = "chrono-cn-badges";
+        badgesContainer.style.cssText = "display: flex; gap: 4px; align-items: center; margin-left: auto;";
+        cnHeader.appendChild(badgesContainer);
+      }
+      badgesContainer.innerHTML = "";
 
-    for (const entry of entries) {
-      const row = document.createElement("div");
-      row.className = "chrono-ext-log-entry";
-
-      // Error/timeout badge fallback
-      if (entry.status === "Error" || entry.status === "Timeout") {
-        const badge = document.createElement("div");
-        badge.className = "chrono-ext-status-badge";
-        badge.setAttribute("data-error", "true");
-        badge.innerHTML = `
-          <span class="chrono-ext-status-dot" style="background:${entry.color}"></span>
-          <span class="chrono-ext-status-text">${entry.status}</span>
-        `;
-        container.appendChild(badge);
-        continue;
+      if (entries.attempts && entries.attempts !== '0') {
+        const attemptsBadge = document.createElement("span");
+        attemptsBadge.className = "chrono-ext-attempts-badge";
+        attemptsBadge.innerHTML = `Tentatives: <strong>${entries.attempts}</strong>`;
+        badgesContainer.appendChild(attemptsBadge);
       }
 
-      const dot = document.createElement("span");
-      dot.className = "chrono-ext-log-dot";
-      dot.style.backgroundColor = entry.color;
+      if (entries.codAmount && parseFloat(entries.codAmount) > 0) {
+        const codBadge = document.createElement("span");
+        codBadge.className = "chrono-ext-cod-badge";
+        codBadge.innerHTML = `COD: <strong>${entries.codAmount} MAD</strong>`;
+        badgesContainer.appendChild(codBadge);
+      }
+    }
 
-      const content = document.createElement("div");
-      content.className = "chrono-ext-log-content";
+    const container = document.createElement("div");
+    container.className = "chrono-ext-status-timeline is-single-line";
 
-      const statusEl = document.createElement("span");
-      statusEl.className = "chrono-ext-log-status";
-      statusEl.title = "Click to toggle full text";
-      
-      // Shorten status by removing text inside parentheses, e.g., "(Reason - ...)"
-      let shortStatus = entry.status.replace(/\s*\(.*?\)/g, '').trim();
-      let fullStatus = entry.fullStatus || entry.status;
-      statusEl.textContent = shortStatus;
+    if (!entries || entries.length === 0) {
+      container.innerHTML = `<span class="chrono-ext-status-text" style="color:#94a3b8; font-size:11.5px;">Aucun statut</span>`;
+      return container;
+    }
 
-      let isExpanded = false;
-      row.style.cursor = "pointer";
-      row.title = "Click to toggle full text";
-      
-      row.addEventListener("click", (e) => {
-        e.stopPropagation();
+    const entry = entries[0];
+
+    // Fallback if cnHeader wasn't passed but badges exist
+    if (!cnHeader && ((entries.attempts && entries.attempts !== '0') || entries.codAmount)) {
+      const topBadges = document.createElement("div");
+      topBadges.className = "chrono-ext-top-badges";
+      topBadges.style.cssText = "display: flex; gap: 4px; align-items: center; margin-bottom: 2px;";
+      if (entries.attempts && entries.attempts !== '0') {
+        const attemptsBadge = document.createElement("span");
+        attemptsBadge.className = "chrono-ext-attempts-badge";
+        attemptsBadge.innerHTML = `Tentatives: <strong>${entries.attempts}</strong>`;
+        topBadges.appendChild(attemptsBadge);
+      }
+      if (entries.codAmount && parseFloat(entries.codAmount) > 0) {
+        const codBadge = document.createElement("span");
+        codBadge.className = "chrono-ext-cod-badge";
+        codBadge.innerHTML = `COD: <strong>${entries.codAmount} MAD</strong>`;
+        topBadges.appendChild(codBadge);
+      }
+      container.appendChild(topBadges);
+    }
+
+    // Error/timeout badge fallback
+    if (entry.status === "Error" || entry.status === "Timeout" || entry.status === "Auth Error") {
+      const line = document.createElement("div");
+      line.className = "chrono-ext-status-line";
+      line.innerHTML = `
+        <span class="chrono-ext-log-dot" style="background:${entry.color || '#ef4444'}"></span>
+        <span class="chrono-ext-log-status" style="color:#ef4444">${entry.status}</span>
+      `;
+      container.appendChild(line);
+      return container;
+    }
+
+    // Build the ONE-LINE detailed status
+    const line = document.createElement("div");
+    line.className = "chrono-ext-status-line";
+
+    const dot = document.createElement("span");
+    dot.className = "chrono-ext-log-dot";
+    dot.style.backgroundColor = entry.color || "#0088ce";
+
+    const statusEl = document.createElement("span");
+    statusEl.className = "chrono-ext-log-status is-current";
+    statusEl.textContent = entry.status;
+
+    // Build detail inline string: reason, worker, hub
+    const details = [];
+    if (entry.reason) details.push(`Motif: ${entry.reason}`);
+    if (entry.worker) details.push(`Livreur: ${entry.worker}`);
+    if (entry.hub) details.push(`Hub: ${entry.hub}`);
+
+    line.appendChild(dot);
+    line.appendChild(statusEl);
+
+    if (details.length > 0) {
+      const detailEl = document.createElement("span");
+      detailEl.className = "chrono-ext-log-detail-inline";
+      detailEl.textContent = `(${details.join(" • ")})`;
+      line.appendChild(detailEl);
+    }
+
+    if (entry.time) {
+      const timeEl = document.createElement("span");
+      timeEl.className = "chrono-ext-log-time";
+      timeEl.textContent = entry.time;
+      line.appendChild(timeEl);
+    }
+
+    // If older history entries exist, add a compact toggle button (+N)
+    if (entries.length > 1) {
+      const toggleBtn = document.createElement("button");
+      toggleBtn.type = "button";
+      toggleBtn.className = "chrono-ext-history-btn";
+      toggleBtn.textContent = `+${entries.length - 1}`;
+      toggleBtn.title = "Voir l'historique complet";
+
+      let historyDropdown = null;
+      toggleBtn.addEventListener("click", (e) => {
         e.preventDefault();
-        console.log("[ChronoExt] Status clicked, expanding:", !isExpanded);
-        isExpanded = !isExpanded;
-        if (isExpanded) {
-          statusEl.textContent = fullStatus;
-          statusEl.classList.add("expanded");
+        e.stopPropagation();
+        if (historyDropdown) {
+          historyDropdown.remove();
+          historyDropdown = null;
+          toggleBtn.textContent = `+${entries.length - 1}`;
         } else {
-          statusEl.textContent = shortStatus;
-          statusEl.classList.remove("expanded");
+          historyDropdown = document.createElement("div");
+          historyDropdown.className = "chrono-ext-history-dropdown";
+          for (let i = 1; i < entries.length; i++) {
+            const h = entries[i];
+            const hRow = document.createElement("div");
+            hRow.className = "chrono-ext-history-item";
+            const hDetails = [];
+            if (h.reason) hDetails.push(`Motif: ${h.reason}`);
+            if (h.worker) hDetails.push(`Livreur: ${h.worker}`);
+            const hDetailsStr = hDetails.length > 0 ? ` (${hDetails.join(" • ")})` : "";
+            hRow.innerHTML = `
+              <span class="chrono-ext-log-dot" style="background:${h.color || '#94a3b8'}; width:6px; height:6px; min-width:6px;"></span>
+              <span style="font-weight:600;">${h.status}</span>
+              <span style="color:#64748b; font-size:11px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">${hDetailsStr}</span>
+              <span style="color:#94a3b8; font-size:10.5px; margin-left:auto; white-space:nowrap;">${h.time || ''}</span>
+            `;
+            historyDropdown.appendChild(hRow);
+          }
+          container.appendChild(historyDropdown);
+          toggleBtn.textContent = "▲";
         }
       });
 
-      content.appendChild(statusEl);
-
-      if (entry.time) {
-        const timeEl = document.createElement("span");
-        timeEl.className = "chrono-ext-log-time";
-        timeEl.textContent = entry.time;
-        content.appendChild(timeEl);
-      }
-
-      row.appendChild(dot);
-      row.appendChild(content);
-      container.appendChild(row);
+      line.appendChild(toggleBtn);
     }
 
+    container.appendChild(line);
     return container;
   }
 
@@ -354,6 +431,77 @@
   // We intentionally do NOT modify the table headers or colgroups anymore.
   // Modifying React-controlled columns (<th>, <colgroup>) crashes the app 
   // when it tries to re-render, preventing new scans from appearing.
+
+  // ── Scanner Trigger Delegation ────────────────────────────
+  function hookScannerButtons(root = document) {
+    if (!root) return;
+    const triggers = root.querySelectorAll(
+      '.ant-input-suffix, ' +
+      '.ant-input-group-addon, ' +
+      '.ant-input-group-addon button, ' +
+      '[class*="scanIcon" i], ' +
+      '[class*="barcode" i], ' +
+      '[class*="scanner" i], ' +
+      '.anticon-scan, ' +
+      'button[aria-label*="scan" i], ' +
+      'button[title*="scan" i]'
+    );
+    triggers.forEach(trigger => {
+      const text = (trigger.textContent || '').trim().toLowerCase();
+      if (text.includes('inscan at hub') || text.includes('outscan at hub') || text.includes('cns scanned') || text.includes('manifest')) return;
+      trigger.style.cursor = 'pointer';
+      trigger.style.minWidth = '44px';
+      trigger.style.minHeight = '44px';
+      trigger.style.display = 'inline-flex';
+      trigger.style.alignItems = 'center';
+      trigger.style.justifyContent = 'center';
+      trigger.style.touchAction = 'manipulation';
+      
+      if (!trigger.hasAttribute('data-chrono-scanner-hooked')) {
+        trigger.setAttribute('data-chrono-scanner-hooked', 'true');
+        trigger.addEventListener('click', (e) => {
+          const appBridge = window.AndroidApp || window.top?.AndroidApp || window.parent?.AndroidApp || (root.ownerDocument?.defaultView?.AndroidApp);
+          if (appBridge && typeof appBridge.launchScanner === 'function') {
+            e.preventDefault();
+            e.stopImmediatePropagation();
+            appBridge.launchScanner();
+          }
+        }, true);
+      }
+    });
+  }
+
+  function attachScannerDelegation(doc = document) {
+    if (!doc || doc.__chronoScannerDelegated) return;
+    try {
+      doc.__chronoScannerDelegated = true;
+      doc.addEventListener('click', (e) => {
+        const appBridge = window.AndroidApp || window.top?.AndroidApp || window.parent?.AndroidApp || (doc.defaultView?.AndroidApp);
+        if (!appBridge || typeof appBridge.launchScanner !== 'function') return;
+
+        const target = e.target;
+        if (!target) return;
+        const trigger = target.closest(
+          '.ant-input-suffix, ' +
+          '.ant-input-group-addon, ' +
+          '.ant-input-group-addon button, ' +
+          '[class*="scanIcon" i], ' +
+          '[class*="barcode" i], ' +
+          '[class*="scanner" i], ' +
+          '.anticon-scan, ' +
+          'button[aria-label*="scan" i], ' +
+          'button[title*="scan" i]'
+        );
+        if (trigger) {
+          const text = (trigger.textContent || '').trim().toLowerCase();
+          if (text.includes('inscan at hub') || text.includes('outscan at hub') || text.includes('cns scanned') || text.includes('manifest')) return;
+          e.preventDefault();
+          e.stopImmediatePropagation();
+          appBridge.launchScanner();
+        }
+      }, true);
+    } catch (_) {}
+  }
 
   // ── Import Excel button ────────────────────────────────────
 
@@ -544,6 +692,9 @@
       wrapper.appendChild(fileInput);
       wrapper.appendChild(btn);
     }
+
+    hookScannerButtons(modal);
+    attachScannerDelegation(modal.ownerDocument || document);
   }
 
   // ── Row processing ────────────────────────────────────────
@@ -567,6 +718,8 @@
       const clone = cnTd.cloneNode(true);
       const existingContainer = clone.querySelector(".chrono-ext-status-container");
       if (existingContainer) existingContainer.remove();
+      const existingHeader = clone.querySelector(".chrono-cn-header");
+      if (existingHeader) existingHeader.remove();
       
       const rawText = clone.textContent || "";
       const cnCodeMatch = rawText.match(/[a-zA-Z0-9_-]+/);
@@ -585,29 +738,54 @@
       let newlyCreated = false;
       
       if (!statusContainer) {
-        // Ensure the cell uses flex layout so the CN number and our timeline sit side-by-side
+        cnTd.classList.add("chrono-ext-cn-cell");
         cnTd.style.display = "flex";
-        cnTd.style.alignItems = "center";
-        cnTd.style.justifyContent = "space-between";
-        cnTd.style.gap = "16px";
-        cnTd.style.minWidth = "600px"; // give it room to breathe
+        cnTd.style.flexDirection = "column";
+        cnTd.style.alignItems = "stretch";
+        cnTd.style.gap = "2px";
+        cnTd.style.padding = "4px 6px";
+
+        let cnHeader = cnTd.querySelector(".chrono-cn-header");
+        if (!cnHeader) {
+          cnHeader = document.createElement("div");
+          cnHeader.className = "chrono-cn-header";
+          cnHeader.innerHTML = `<span class="chrono-cn-code">${cnCode}</span><div class="chrono-cn-badges"></div>`;
+          
+          // Hide or remove native Shipsy child nodes so they never collide with status
+          Array.from(cnTd.childNodes).forEach(node => {
+            if (node.nodeType === Node.TEXT_NODE) {
+              node.remove();
+            } else if (node.nodeType === Node.ELEMENT_NODE && !node.classList.contains("chrono-cn-header") && !node.classList.contains("chrono-ext-status-container")) {
+              node.style.display = "none";
+            }
+          });
+          cnTd.prepend(cnHeader);
+        }
 
         statusContainer = document.createElement("div");
         statusContainer.className = "chrono-ext-status-container";
-        // We use flex: 1 here so it takes remaining space without pushing the CN text out
-        statusContainer.style.flex = "1";
-        statusContainer.style.minWidth = "0";
+        statusContainer.style.width = "100%";
         cnTd.appendChild(statusContainer);
         newlyCreated = true;
       }
 
+      // Hide any stray native nodes inserted by React during re-render
+      let cnHeader = cnTd.querySelector(".chrono-cn-header");
+      Array.from(cnTd.childNodes).forEach(node => {
+        if (node !== cnHeader && node !== statusContainer) {
+          if (node.nodeType === Node.TEXT_NODE) node.remove();
+          else if (node.nodeType === Node.ELEMENT_NODE) node.style.display = "none";
+        }
+      });
+
       // If we just recreated the container (due to React re-render) OR it's a completely new row
       if (newlyCreated || !row.hasAttribute(ATTR_PROCESSED)) {
         statusContainer.innerHTML = "";
+        let cnHeader = cnTd.querySelector(".chrono-cn-header");
         
         if (statusCache.has(cnCode)) {
           // Instantly restore from cache if React wiped it out
-          statusContainer.appendChild(createStatusTimeline(statusCache.get(cnCode)));
+          statusContainer.appendChild(createStatusTimeline(statusCache.get(cnCode), cnHeader));
           row.setAttribute(ATTR_PROCESSED, "true");
         } else {
           // Show loading state
@@ -621,9 +799,10 @@
               // Verify this row is still showing the same CN code before updating
               if (row.getAttribute("data-chrono-cn") === cnCode) {
                 let currentContainer = row.querySelector(".chrono-ext-status-container");
+                let currentHeader = row.querySelector(".chrono-cn-header");
                 if (currentContainer) {
                   currentContainer.innerHTML = "";
-                  currentContainer.appendChild(createStatusTimeline(entries));
+                  currentContainer.appendChild(createStatusTimeline(entries, currentHeader));
                 }
               }
             });
@@ -756,7 +935,7 @@
     overlay.dataset.ready = 'false';
     overlay.innerHTML = `
       <div class="chrono-iframe-loading">Loading Scanner...</div>
-      <iframe id="chrono-inscan-iframe" src="/ops/consignments"></iframe>
+      <iframe id="chrono-inscan-iframe" src="/ops/consignments" allow="camera; microphone; autoplay; clipboard-write;"></iframe>
     `;
     document.body.appendChild(overlay);
 
@@ -774,6 +953,9 @@
             doc.defaultView.XLSX = window.XLSX || window.top?.XLSX;
           }
         } catch (e) {}
+
+        attachScannerDelegation(doc);
+        hookScannerButtons(doc.body || doc);
         
         // Hide standard layout elements and ensure clean mobile responsiveness
         const style = doc.createElement('style');
@@ -789,85 +971,70 @@
             inset: 0 !important;
             z-index: 1000 !important; 
             overflow-y: auto !important; 
-            padding: 16px !important;
+            padding: 4px !important;
             display: flex !important;
             align-items: center !important;
             justify-content: center !important;
           }
           .ant-modal { 
-            width: 1150px !important; 
-            max-width: 95vw !important; 
+            width: 98vw !important; 
+            max-width: 98vw !important; 
             margin: auto !important; 
-            top: 20px !important;
+            top: 0 !important;
             padding-bottom: 0 !important;
           }
+          @media (min-width: 769px) {
+            .ant-modal {
+              width: 1000px !important;
+              max-width: 95vw !important;
+            }
+          }
           .ant-modal-content { 
-            border-radius: 8px !important; 
-            max-height: 90vh !important; 
+            border-radius: 14px !important; 
+            max-height: 94vh !important; 
             display: flex !important;
             flex-direction: column !important;
             overflow: hidden !important; 
-            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.25) !important;
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.35) !important;
           }
           .ant-modal-header {
-            padding: 14px 20px !important;
+            padding: 12px 14px !important;
             border-bottom: 1px solid #f0f0f0 !important;
           }
           .ant-modal-title {
-            font-size: 16px !important;
+            font-size: 17px !important;
             font-weight: 700 !important;
             color: #1e293b !important;
           }
           .ant-modal-close {
             top: 10px !important;
-            right: 12px !important;
-            width: 32px !important;
-            height: 32px !important;
+            right: 10px !important;
+            width: 38px !important;
+            height: 38px !important;
           }
           .ant-modal-close-x {
-            width: 32px !important;
-            height: 32px !important;
-            line-height: 32px !important;
+            width: 38px !important;
+            height: 38px !important;
+            line-height: 38px !important;
             font-size: 16px !important;
           }
           .ant-modal-body { 
-            max-height: calc(90vh - 120px) !important; 
+            max-height: calc(92vh - 120px) !important; 
             overflow-y: auto !important; 
-            padding: 16px 20px !important; 
+            padding: 10px 8px !important; 
           }
           .ant-modal-footer {
-            padding: 10px 20px !important;
+            padding: 8px 14px !important;
             border-top: 1px solid #f0f0f0 !important;
             display: flex !important;
             justify-content: flex-end !important;
             gap: 8px !important;
           }
           .ant-modal-footer button {
-            min-height: 36px !important;
-            padding: 0 16px !important;
-            border-radius: 4px !important;
+            min-height: 40px !important;
+            padding: 0 20px !important;
+            border-radius: 6px !important;
             font-weight: 600 !important;
-          }
-          @media (max-width: 768px) {
-            .ant-modal-wrap {
-              padding: 10px !important;
-            }
-            .ant-modal {
-              width: 96vw !important;
-              max-width: 440px !important;
-              top: 0 !important;
-            }
-            .ant-modal-content {
-              border-radius: 14px !important;
-            }
-            .ant-modal-body {
-              padding: 12px !important;
-              max-height: calc(90vh - 130px) !important;
-            }
-            .ant-modal-footer button {
-              min-height: 40px !important;
-            }
-          }
             font-size: 14px !important;
           }
 
@@ -883,8 +1050,8 @@
           /* Import Excel button */
           .chrono-ext-import-btn,
           button.chrono-ext-import-btn {
-            margin-top: 8px !important;
-            margin-bottom: 8px !important;
+            margin-top: 6px !important;
+            margin-bottom: 6px !important;
             height: 36px !important;
             font-size: 13px !important;
             border-radius: 6px !important;
@@ -894,13 +1061,170 @@
           .ant-table-wrapper { 
             width: 100% !important; 
             overflow-x: auto !important; 
-            margin-top: 8px !important;
+            margin-top: 6px !important;
           }
           .ant-table {
+            width: 100% !important;
             font-size: 13px !important;
           }
           .ant-table th, .ant-table td {
+            padding: 6px 4px !important;
+          }
+          .ant-table-tbody > tr > td:first-child,
+          .ant-table-thead > tr > th:first-child {
+            width: 34px !important;
+            min-width: 34px !important;
+            max-width: 38px !important;
+            padding: 6px 2px !important;
+            text-align: center !important;
+          }
+          .ant-table-tbody > tr > td:last-child,
+          .ant-table-thead > tr > th:last-child {
+            width: 44px !important;
+            min-width: 44px !important;
+            max-width: 48px !important;
+            padding: 6px 2px !important;
+            text-align: center !important;
+          }
+
+          /* Status container and cards inside modal */
+          .chrono-ext-cn-cell {
+            display: flex !important;
+            flex-direction: column !important;
+            align-items: stretch !important;
+            gap: 6px !important;
+            width: 100% !important;
             padding: 8px 6px !important;
+            box-sizing: border-box !important;
+          }
+          .chrono-cn-header {
+            display: flex !important;
+            justify-content: space-between !important;
+            align-items: center !important;
+            width: 100% !important;
+            gap: 6px !important;
+            padding-bottom: 2px !important;
+          }
+          .chrono-cn-code {
+            font-weight: 700 !important;
+            font-size: 14px !important;
+            color: #0f172a !important;
+            letter-spacing: 0.3px !important;
+          }
+          .chrono-ext-status-container {
+            width: 100% !important;
+            box-sizing: border-box !important;
+          }
+          .chrono-ext-status-timeline {
+            display: flex !important;
+            flex-direction: column !important;
+            align-items: stretch !important;
+            gap: 6px !important;
+            width: 100% !important;
+            background: #f8fafc !important;
+            border: 1px solid #e2e8f0 !important;
+            border-radius: 8px !important;
+            padding: 8px 10px !important;
+            box-sizing: border-box !important;
+          }
+          .chrono-ext-attempts-badge {
+            display: inline-flex !important;
+            align-items: center !important;
+            background: #fee2e2 !important;
+            color: #b91c1c !important;
+            border: 1px solid #fca5a5 !important;
+            border-radius: 6px !important;
+            font-size: 11px !important;
+            font-weight: 600 !important;
+            padding: 2px 8px !important;
+          }
+          .chrono-ext-log-entry {
+            display: flex !important;
+            align-items: flex-start !important;
+            gap: 8px !important;
+            width: 100% !important;
+            padding: 4px 0 !important;
+          }
+          .chrono-ext-log-entry:not(:last-child) {
+            border-bottom: 1px dashed #e2e8f0 !important;
+            padding-bottom: 6px !important;
+            margin-bottom: 2px !important;
+          }
+          .chrono-ext-log-entry::after {
+            display: none !important;
+          }
+          .chrono-ext-log-dot {
+            display: inline-block !important;
+            width: 10px !important;
+            height: 10px !important;
+            border-radius: 50% !important;
+            margin-top: 4px !important;
+            flex-shrink: 0 !important;
+            box-shadow: 0 0 0 2px rgba(255,255,255,0.8) !important;
+          }
+          .chrono-ext-log-content {
+            display: flex !important;
+            flex-direction: column !important;
+            flex: 1 1 auto !important;
+            min-width: 0 !important;
+          }
+          .chrono-ext-log-title-row {
+            display: flex !important;
+            justify-content: space-between !important;
+            align-items: center !important;
+            width: 100% !important;
+            gap: 8px !important;
+          }
+          .chrono-ext-log-status {
+            font-size: 13px !important;
+            font-weight: 600 !important;
+            color: #1e293b !important;
+            line-height: 1.3 !important;
+          }
+          .chrono-ext-log-status.is-current {
+            color: #0f172a !important;
+            font-size: 13.5px !important;
+          }
+          .chrono-ext-log-time {
+            font-size: 11px !important;
+            font-weight: 600 !important;
+            color: #475569 !important;
+            background: #e2e8f0 !important;
+            padding: 2px 6px !important;
+            border-radius: 4px !important;
+            white-space: nowrap !important;
+          }
+          .chrono-ext-log-detail {
+            font-size: 11.5px !important;
+            color: #475569 !important;
+            margin-top: 3px !important;
+            line-height: 1.35 !important;
+          }
+          .chrono-ext-status-badge {
+            display: inline-flex !important;
+            align-items: center !important;
+            gap: 6px !important;
+            padding: 3px 8px !important;
+            border-radius: 12px !important;
+            background: rgba(0, 0, 0, 0.05) !important;
+            font-size: 12px !important;
+          }
+          .chrono-ext-status-badge[data-error="true"] {
+            background: #fee2e2 !important;
+            color: #b91c1c !important;
+          }
+          .chrono-ext-spinner {
+            display: inline-block !important;
+            width: 14px !important;
+            height: 14px !important;
+            border: 2px solid rgba(0, 0, 0, 0.15) !important;
+            border-top-color: #1890ff !important;
+            border-radius: 50% !important;
+            animation: chrono-ext-spin 0.6s linear infinite !important;
+            flex-shrink: 0 !important;
+          }
+          @keyframes chrono-ext-spin {
+            to { transform: rotate(360deg); }
           }
         `;
         doc.head.appendChild(style);
@@ -1311,6 +1635,47 @@
       checkAllBtn.style.background = '#52c41a';
       checkAllBtn.style.borderColor = '#52c41a';
       checkAllBtn.innerHTML = `<span>☑ Tout Cocher pour Règlement (${uncheckedBoxes.length} restants)</span>`;
+    }
+  }
+
+  // ── Fix Dropdown z-index Stacking on Rider List ─────────────
+  function fixRiderDropdownStacking() {
+    if (!location.pathname.includes("/ops/reconciliation/rider-list")) return;
+
+    if (!document.__chronoDropdownStackingAttached) {
+      document.__chronoDropdownStackingAttached = true;
+
+      document.addEventListener('click', (e) => {
+        const target = e.target;
+        if (!target) return;
+
+        const filterBtn = target.closest('[class*="multiSelectFilter"], [class*="selectButton"], [class*="select-btn"], button, [class*="filter-menu"]');
+        const filterRows = Array.from(document.querySelectorAll('[class*="filterRow-"]'));
+
+        if (filterBtn) {
+          const clickedRow = filterBtn.closest('[class*="filterRow-"]');
+          if (clickedRow) {
+            filterRows.forEach(row => {
+              if (row === clickedRow) {
+                row.style.setProperty('z-index', '10005', 'important');
+              } else {
+                row.style.setProperty('z-index', '1', 'important');
+              }
+            });
+            return;
+          }
+        }
+
+        // When clicking outside or closing dropdown, reset after brief delay
+        setTimeout(() => {
+          const hasOpenMenu = document.querySelector('[class*="filter-menu"]:not([style*="display: none"]), [class*="menuItemLayout"], .ant-dropdown:not(.ant-dropdown-hidden)');
+          if (!hasOpenMenu) {
+            filterRows.forEach(row => {
+              row.style.removeProperty('z-index');
+            });
+          }
+        }, 150);
+      }, true);
     }
   }
 
@@ -2329,12 +2694,14 @@
 
   // Watch for modal open/close on body
   const bodyObserver = new MutationObserver(() => {
+    attachScannerDelegation(document);
+    hookScannerButtons(document.body);
     checkReconciliationToast();
+    fixRiderDropdownStacking();
     ensureInscanButton();
     ensureVerifyCompletedButton();
     ensureDefaultFilters();
     ensureSalaryExportButton();
-    ensureStatusUpdateUI();
     ensureSettlementMenu();
     
     const modal = getScanModal(document);
@@ -2353,11 +2720,11 @@
   // Fallback poll (SPA route changes may not trigger body mutations)
   setInterval(() => {
     checkReconciliationToast();
+    fixRiderDropdownStacking();
     ensureInscanButton();
     ensureVerifyCompletedButton();
     ensureDefaultFilters();
     ensureSalaryExportButton();
-    ensureStatusUpdateUI();
     ensureSettlementMenu();
 
     
@@ -3156,171 +3523,20 @@
     return Object.values(riderMap);
   }
 
-  // ── Consignment Status Update ────────────────────────
-
-  function ensureStatusUpdateUI() {
-    if (!location.pathname.includes('/ops/details/')) {
-      const widget = document.querySelector('.chrono-status-widget');
-      if (widget) widget.remove();
-      return;
+  // ── Global Internal Link Interceptor (Prevent blank target tab break) ─
+  document.addEventListener('click', (e) => {
+    const link = e.target.closest('a');
+    if (link) {
+      const href = link.getAttribute('href') || '';
+      if (href.startsWith('/') || href.includes('cross.chronodiali.ma') || href.includes('shipsy.io')) {
+        if (link.getAttribute('target') === '_blank') {
+          link.removeAttribute('target');
+        }
+      }
     }
+  }, true);
 
-    if (document.querySelector('.chrono-status-widget')) return;
-
-    // Extract reference number safely from URL
-    const cleanPath = location.pathname.replace(/\/+$/, '');
-    const parts = cleanPath.split('/').filter(Boolean);
-    const referenceNumber = parts[parts.length - 1];
-    if (!referenceNumber) return;
-
-    const savedApiKey = localStorage.getItem('chrono_shipsy_api_key') || '';
-
-    const widget = document.createElement('div');
-    widget.className = 'chrono-status-widget';
-    widget.innerHTML = `
-      <div class="chrono-status-header">
-        <span>Chrono: Update Status</span>
-        <button class="chrono-status-key-toggle" title="Configure Shipsy API Key" type="button">🔑</button>
-      </div>
-      <div class="chrono-status-body">
-        <div class="chrono-status-key-box" style="${savedApiKey ? 'display: none;' : ''}">
-          <input type="password" class="chrono-status-key-input" placeholder="Paste Shipsy API Key" value="${savedApiKey ? '••••••••' : ''}" />
-          <button class="chrono-status-key-save" type="button">Save</button>
-        </div>
-        <select class="chrono-status-select">
-          <option value="">-- Select Status --</option>
-          <option value="reached_at_hub">Reached at Hub</option>
-          <option value="delivered">Delivered</option>
-          <option value="attempted">Attempted / Undelivered</option>
-          <option value="cancel">Cancelled</option>
-          <option value="pickup_completed">Pickup Completed</option>
-          <option value="reacheddestination">Reached Destination</option>
-          <option value="rto_delivered">RTO Delivered</option>
-          <option value="rto">RTO Initiated</option>
-        </select>
-        <input type="text" class="chrono-status-reason" placeholder="Reason (e.g. absent, refusé, injoignable)" style="display: none;" />
-        <button class="chrono-status-btn" disabled>Update</button>
-      </div>
-    `;
-
-    document.body.appendChild(widget);
-
-    const select = widget.querySelector('.chrono-status-select');
-    const reasonInput = widget.querySelector('.chrono-status-reason');
-    const btn = widget.querySelector('.chrono-status-btn');
-    const keyToggle = widget.querySelector('.chrono-status-key-toggle');
-    const keyBox = widget.querySelector('.chrono-status-key-box');
-    const keyInput = widget.querySelector('.chrono-status-key-input');
-    const keySaveBtn = widget.querySelector('.chrono-status-key-save');
-
-    // Toggle API key box
-    keyToggle.addEventListener('click', () => {
-      const isHidden = keyBox.style.display === 'none';
-      keyBox.style.display = isHidden ? 'flex' : 'none';
-      if (isHidden) {
-        keyInput.value = localStorage.getItem('chrono_shipsy_api_key') || '';
-        keyInput.focus();
-      }
-    });
-
-    // Save API key
-    keySaveBtn.addEventListener('click', () => {
-      const val = keyInput.value.trim();
-      if (val && !val.includes('••••')) {
-        localStorage.setItem('chrono_shipsy_api_key', val);
-        showToast('Shipsy API Key saved ✓');
-        keyBox.style.display = 'none';
-      } else if (!val) {
-        localStorage.removeItem('chrono_shipsy_api_key');
-        showToast('Shipsy API Key removed');
-      } else {
-        keyBox.style.display = 'none';
-      }
-    });
-
-    const checkValidity = () => {
-      const needsReason = select.value === 'attempted' || select.value === 'cancel';
-      if (needsReason) {
-        btn.disabled = !reasonInput.value.trim();
-      } else {
-        btn.disabled = !select.value;
-      }
-    };
-
-    select.addEventListener('change', () => {
-      if (select.value === 'attempted' || select.value === 'cancel') {
-        reasonInput.style.display = 'block';
-      } else {
-        reasonInput.style.display = 'none';
-        reasonInput.value = '';
-      }
-      checkValidity();
-    });
-
-    reasonInput.addEventListener('input', checkValidity);
-
-    btn.addEventListener('click', async () => {
-      const eventCode = select.value;
-      if (!eventCode) return;
-      const reason = reasonInput.value.trim();
-      const currentApiKey = localStorage.getItem('chrono_shipsy_api_key') || '';
-
-      if (!currentApiKey) {
-        keyBox.style.display = 'flex';
-        keyInput.value = '';
-        keyInput.focus();
-        showToast('⚠️ Shipsy API Key required. Please enter your API key and click Save.');
-        return;
-      }
-
-      btn.disabled = true;
-      btn.textContent = 'Updating...';
-
-      try {
-        await updateConsignmentStatus(eventCode, referenceNumber, reason, currentApiKey);
-        showToast(`✓ Status successfully updated to ${eventCode}`);
-        setTimeout(() => location.reload(), 1800);
-      } catch (err) {
-        console.error('[ChronoExt] Status update failed:', err);
-        const errStr = err.message || String(err);
-        
-        if (errStr.includes('API key') || errStr.includes('NO_API_KEY') || errStr.includes('WRONG_API_KEY') || errStr.includes('401')) {
-          keyBox.style.display = 'flex';
-          keyInput.focus();
-          showToast(`❌ Authentication failed: ${errStr}. Check API Key.`);
-        } else {
-          showToast(`❌ Update failed: ${errStr}`);
-        }
-
-        btn.disabled = false;
-        btn.textContent = 'Update';
-      }
-    });
-  }
-
-  function updateConsignmentStatus(eventCode, referenceNumber, reason, apiKey) {
-    return new Promise((resolve, reject) => {
-      chrome.runtime.sendMessage({
-        action: 'UPDATE_CONSIGNMENT_STATUS',
-        eventCode,
-        referenceNumber,
-        reason,
-        apiKey: apiKey || localStorage.getItem('chrono_shipsy_api_key') || '',
-        apiTokens
-      }, (response) => {
-        if (chrome.runtime.lastError) {
-          return reject(new Error(chrome.runtime.lastError.message || 'Failed to communicate with extension background service worker. Please reload the extension.'));
-        }
-        if (!response) {
-          return reject(new Error('No response from background service worker.'));
-        }
-        if (!response.success) {
-          return reject(new Error(response.error || `HTTP ${response.status || 'Error'}`));
-        }
-        resolve(response.data);
-      });
-    });
-  }
-
+  attachScannerDelegation(document);
+  hookScannerButtons(document.body);
   console.log("[ChronoExt] Parcel Status extension loaded ✓");
 })();
