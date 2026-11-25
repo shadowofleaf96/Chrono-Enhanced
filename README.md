@@ -225,11 +225,33 @@ sequenceDiagram
 
 ## 📝 Complete Changelog
 
-### v1.2.3 — Responsive Consignment & Trip Details, In-App Navigation & Cleanup
+### v1.2.4 — Full Parcel Status Timeline Restoration, Trip Manager Tap Fix & Mobile UI Polish
+- **Fix (Trip Manager Click Navigation)**:
+  - Fixed `ChronoWebActivity.onCreateWindow` using a dedicated temporary `WebView` client so `target="_blank"` and `window.open()` links route reliably in-app.
+  - Added proactive `stripInternalBlankTargets()` and row/cell tap delegation in `chrono_content.js` & `content.js`, expanding Trip `#` links (`td a[href*="/trip/details/"]`) to `44px` touch height so tapping anywhere in the cell opens the chosen trip cleanly.
+- **Fix (Restored Full Multi-Entry Parcel Status in Scan Modals)**:
+  - Restored full 3-event vertical status timeline cards in `createStatusTimeline` across `Inscan at Hub`, `Outscan at Hub`, `Arrival`, and scan modals (`chrono_content.js`, `content.js`, `chrono_mobile.css`, `styles.css`), showing full wrapping status text, `Tentatives` & `COD` header badges, timestamps, `Motif`, `Livreur`, and `Hub` details without clipping.
+  - Added `findCnCellInRow` in `processTableRows` so tracking cells are detected cleanly across any modal table layout.
+- **UI/UX (Cross-Page Mobile Layout & Sleek Polish)**:
+  - **Trip Manager (`/ops/retail/trip-manager`)**: Reset AntD `.ant-tabs-nav-list` translation and stacked `.ant-tabs-nav:has(.ant-tabs-extra-content)` so status tabs (`All`, `Created`, `Scheduled`, `Assigned`, `Started`, `Completed`) stay visible at `x=0` above `Map Edit`; extended the collapsible **`🔍 Filtres ▼`** toggle to Trip Manager and kept action toolbars in a single horizontally swipeable row.
+  - **Chosen Trip Details (`/ops/retail/trip/details/:id`)**: Exempted pagination arrow containers (`[class*="container-"]:has(.anticon-left, .anticon-right)`) from column stacking so pagination (`|< < 1 >`) remains cleanly horizontal beneath `Search CN`; prevented `.ant-input-clear-icon` from being hooked as a barcode scanner trigger.
+  - **Rider Reconciliation (`/ops/reconciliation/rider-list`)**: Unpinned sticky right `Actions` column on narrow mobile widths to eliminate `CN Balance | Actions` header collisions, widened single-date inputs, and centered table empty states inside the viewport.
+  - **Consignments & Modals**: Prevented premature soft-keyboard focus on navbar search inputs on route load, left-aligned Consignment Logs cards (`text-indent: 0`), refined drawer height, and removed 1px modal table overflow.
+
+### v1.2.3 — Responsive Consignment & Trip Details, Sub-Tabs Engine & Cleanup
 - **UI/UX (Responsive Consignment Details Page `/ops/details/:id`)**:
   - Converted cramped 4-column cards (`.ant-col-6`) into a clean 2-column mobile layout (`width: 50% !important; max-width: 50% !important;`).
   - Fixed word-splitting and character truncation (e.g., "NON-DOCUMEN T" fixed to "NON-DOCUMENT").
+  - Fixed empty right-side dead space on sub-tabs by removing legacy `calc(100% - 100px)` restriction and letting tabs naturally span 100% full width with smooth horizontal scrolling.
+  - Eliminated redundant blue underline (`.ant-tabs-ink-bar`) under active pill tabs for a crisp, polished appearance.
+  - Hidden desktop-only table font-size/settings row (`[class*="setFontSize"]`) on mobile to remove dead vertical whitespace above shipment cards.
   - Ensured wide fields (addresses, special notes) cleanly expand to full width (`100%`).
+- **UI/UX (Universal Responsive Sub-Tabs Engine)**:
+  - **Unclipped Table Data (`Piece Details`, `CN Tracking`, `Call Logs`, etc.)**: Overrode Shipsy's hardcoded inline 80px cell widths with `table-layout: auto !important; width: max-content !important;`. Overrode column 2 (`CN Number` / tracking number `MRJN0035983081A`) to `min-width: 180px` so codes are 100% legible without `...` ellipsis truncation.
+  - **Horizontal Scroll Containers**: Enclosed sub-tab tables in smooth horizontal scrolling cards (`border-radius: 10px; border: 1px solid #e2e8f0;`) with touch momentum.
+  - **Consignment Logs Modern Timeline**: Stacked the timestamp and event cards vertically (`flex-direction: column !important`) so values like `Pickup Awaited` and `0 Changes` never wrap awkwardly or split words across lines.
+  - **Touch-Friendly Controls**: Styled sub-tab action buttons ("Custom view ∨", "Export") with 38px touch targets and rounded corners.
+  - **Centered Empty States**: Framed empty states (`.ant-empty`) in soft dashed cards for all tabs with no records.
 - **UI/UX (Responsive Chosen Trip Details `/ops/retail/trip/details/:id`)**:
   - Restructured top trip summary stats (`[class*="itemsWrapper-"]`) into an organized 2-column CSS Grid (`grid-template-columns: repeat(2, 1fr)`).
   - Transformed crowded chips into bordered cards with soft backgrounds and distinct label/value typography.

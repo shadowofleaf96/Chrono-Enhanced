@@ -37,108 +37,166 @@
   text-overflow: ellipsis;
 }
 
-/* ── Multi-status timeline (3 recent logs) ─────────────────── */
+/* ── Multi-status timeline (3 recent logs, full visibility on desktop & mobile) ─── */
+
+.chrono-ext-cn-td {
+  white-space: normal !important;
+  overflow: visible !important;
+  vertical-align: top !important;
+  padding: 6px 8px !important;
+}
+
+.chrono-ext-cn-inner {
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 4px;
+  width: 100%;
+  box-sizing: border-box;
+}
+
+.chrono-cn-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  flex-wrap: wrap;
+  width: 100%;
+  gap: 6px;
+  padding-bottom: 2px;
+}
+
+.chrono-cn-code {
+  font-weight: 700;
+  font-size: 13.5px;
+  color: #0f172a;
+  letter-spacing: 0.3px;
+}
+
+.chrono-cn-badges {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px;
+  margin-left: auto;
+}
+
+.chrono-ext-attempts-badge {
+  display: inline-flex;
+  align-items: center;
+  background: #fee2e2;
+  color: #b91c1c;
+  border: 1px solid #fca5a5;
+  border-radius: 4px;
+  font-size: 11px;
+  font-weight: 600;
+  padding: 1px 6px;
+}
+
+.chrono-ext-cod-badge {
+  display: inline-flex;
+  align-items: center;
+  background: #ecfdf5;
+  color: #047857;
+  border: 1px solid #a7f3d0;
+  border-radius: 4px;
+  font-size: 11px;
+  font-weight: 600;
+  padding: 1px 6px;
+}
+
+.chrono-ext-status-container {
+  width: 100%;
+  box-sizing: border-box;
+}
 
 .chrono-ext-status-timeline {
   display: flex;
-  flex-direction: row;
-  align-items: center;
-  gap: 16px;
-  padding: 2px 0;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 4px;
+  padding: 6px 8px;
   width: 100%;
-  overflow-x: auto;
-}
-/* Hide scrollbar for cleaner look but keep scrollable if needed */
-.chrono-ext-status-timeline::-webkit-scrollbar {
-  display: none;
+  background: #f8fafc;
+  border: 1px solid #e2e8f0;
+  border-radius: 6px;
+  box-sizing: border-box;
 }
 
 .chrono-ext-log-entry {
   display: flex;
-  align-items: center;
-  gap: 6px;
+  align-items: flex-start;
+  gap: 8px;
   position: relative;
-  flex: 0 1 auto;
-  min-width: 0;
+  width: 100%;
+  padding: 3px 0;
 }
 
-/* Horizontal connector arrow between entries */
-.chrono-ext-log-entry:not(:last-child)::after {
-  content: "›";
-  position: absolute;
-  right: -11px;
-  top: 50%;
-  transform: translateY(-50%);
-  color: rgba(0, 0, 0, 0.25);
-  font-size: 14px;
-  line-height: 1;
+.chrono-ext-log-entry:not(:last-child) {
+  border-bottom: 1px dashed #e2e8f0;
+  padding-bottom: 5px;
 }
 
 /* Dot on the timeline */
 .chrono-ext-log-dot {
   display: inline-block;
-  width: 8px;
-  height: 8px;
+  width: 9px;
+  height: 9px;
+  min-width: 9px;
   border-radius: 50%;
+  margin-top: 4px;
   flex-shrink: 0;
-}
-
-/* First entry (most recent) is larger */
-.chrono-ext-log-entry:first-child .chrono-ext-log-dot {
-  width: 10px;
-  height: 10px;
 }
 
 .chrono-ext-log-content {
   display: flex;
-  flex-direction: row;
-  align-items: center;
-  gap: 6px;
+  flex-direction: column;
+  flex: 1 1 auto;
   min-width: 0;
 }
 
+.chrono-ext-log-title-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  width: 100%;
+  gap: 8px;
+}
+
 .chrono-ext-log-status {
-  font-size: 12px;
-  font-weight: 500;
-  color: rgba(0, 0, 0, 0.85);
-  text-transform: capitalize;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  max-width: 160px; /* limits width so 3 logs fit horizontally */
-  cursor: pointer;
-  transition: all 0.3s ease;
-}
-
-.chrono-ext-log-status:hover {
-  color: #1890ff;
-}
-
-.chrono-ext-log-status.expanded {
-  white-space: normal !important;
-  overflow: visible !important;
-  max-width: none !important;
-}
-
-/* First entry text is bolder */
-.chrono-ext-log-entry:first-child .chrono-ext-log-status {
+  font-size: 12.5px;
   font-weight: 600;
-  color: rgba(0, 0, 0, 0.95);
+  color: #334155;
+  line-height: 1.35;
+  white-space: normal;
+  word-break: break-word;
+  overflow: visible;
 }
 
-/* Older entries are slightly muted */
-.chrono-ext-log-entry:not(:first-child) .chrono-ext-log-status {
-  color: rgba(0, 0, 0, 0.55);
-  font-weight: 400;
+.chrono-ext-log-status.is-current {
+  font-weight: 700;
+  color: #0f172a;
+  font-size: 13px;
 }
 
 .chrono-ext-log-time {
-  font-size: 10px;
-  color: rgba(0, 0, 0, 0.40);
+  font-size: 11px;
+  font-weight: 600;
+  color: #475569;
+  background: #e2e8f0;
+  padding: 1px 6px;
+  border-radius: 4px;
   white-space: nowrap;
-  letter-spacing: -0.2px;
-  transform: scale(0.85);
-  transform-origin: left center;
+  flex-shrink: 0;
+}
+
+.chrono-ext-log-detail {
+  font-size: 11.5px;
+  color: #475569;
+  margin-top: 2px;
+  line-height: 1.35;
+  white-space: normal;
+  word-break: break-word;
+  overflow: visible;
 }
 
 /* ── Spinner (loading state) ───────────────────────────────── */
@@ -712,13 +770,33 @@
     margin: 8px auto !important;
   }
 
-  .chrono-ext-cn-cell {
+  .ant-table-tbody td a[href*="/trip/details/"],
+  .ant-table-tbody td a[href*="/ops/details/"] {
+    display: flex !important;
+    align-items: center !important;
+    width: 100% !important;
+    min-height: 44px !important;
+    padding: 6px 4px !important;
+    font-weight: 700 !important;
+    color: #0088ce !important;
+    text-decoration: none !important;
+    touch-action: manipulation !important;
+    cursor: pointer !important;
+  }
+
+  .chrono-ext-cn-td {
+    white-space: normal !important;
+    overflow: visible !important;
+    vertical-align: top !important;
+    padding: 6px !important;
+  }
+
+  .chrono-ext-cn-inner {
     display: flex !important;
     flex-direction: column !important;
     align-items: stretch !important;
-    gap: 2px !important;
+    gap: 4px !important;
     width: 100% !important;
-    padding: 4px 6px !important;
     box-sizing: border-box !important;
   }
 
@@ -726,9 +804,10 @@
     display: flex !important;
     justify-content: space-between !important;
     align-items: center !important;
+    flex-wrap: wrap !important;
     width: 100% !important;
     gap: 6px !important;
-    padding-bottom: 1px !important;
+    padding-bottom: 2px !important;
   }
 
   .chrono-cn-code {
@@ -740,6 +819,7 @@
 
   .chrono-cn-badges {
     display: flex !important;
+    flex-wrap: wrap !important;
     align-items: center !important;
     gap: 4px !important;
     margin-left: auto !important;
@@ -759,124 +839,49 @@
     background: #f8fafc !important;
     border: 1px solid #e2e8f0 !important;
     border-radius: 6px !important;
-    padding: 3px 6px !important;
+    padding: 6px 8px !important;
+    gap: 4px !important;
     box-sizing: border-box !important;
   }
 
-  .chrono-ext-status-timeline.is-single-line {
-    padding: 3px 6px !important;
-  }
-
-  .chrono-ext-status-line {
+  .chrono-ext-log-entry {
     display: flex !important;
-    align-items: center !important;
-    gap: 6px !important;
+    align-items: flex-start !important;
+    gap: 8px !important;
     width: 100% !important;
-    font-size: 12px !important;
-    line-height: 1.25 !important;
-    overflow: hidden !important;
+    padding: 4px 0 !important;
   }
 
-  .chrono-ext-attempts-badge {
-    display: inline-flex !important;
-    align-items: center !important;
-    background: #fee2e2 !important;
-    color: #b91c1c !important;
-    border: 1px solid #fca5a5 !important;
-    border-radius: 4px !important;
-    font-size: 10.5px !important;
-    font-weight: 600 !important;
-    padding: 1px 6px !important;
-  }
-
-  .chrono-ext-cod-badge {
-    display: inline-flex !important;
-    align-items: center !important;
-    background: #ecfdf5 !important;
-    color: #047857 !important;
-    border: 1px solid #a7f3d0 !important;
-    border-radius: 4px !important;
-    font-size: 10.5px !important;
-    font-weight: 600 !important;
-    padding: 1px 6px !important;
-  }
-
-  .chrono-ext-log-dot {
-    display: inline-block !important;
-    width: 7px !important;
-    height: 7px !important;
-    min-width: 7px !important;
-    border-radius: 50% !important;
-    flex-shrink: 0 !important;
-    box-shadow: 0 0 0 1.5px rgba(255,255,255,0.9) !important;
+  .chrono-ext-log-entry:not(:last-child) {
+    border-bottom: 1px dashed #e2e8f0 !important;
+    padding-bottom: 6px !important;
+    margin-bottom: 2px !important;
   }
 
   .chrono-ext-log-status {
     font-size: 12.5px !important;
-    font-weight: 700 !important;
-    color: #1e293b !important;
-    white-space: nowrap !important;
-    flex-shrink: 0 !important;
+    font-weight: 600 !important;
+    color: #334155 !important;
+    line-height: 1.35 !important;
+    white-space: normal !important;
+    word-break: break-word !important;
+    overflow: visible !important;
   }
 
   .chrono-ext-log-status.is-current {
-    color: #0f172a !important;
-  }
-
-  .chrono-ext-log-detail-inline {
-    font-size: 11px !important;
-    color: #64748b !important;
-    white-space: nowrap !important;
-    overflow: hidden !important;
-    text-overflow: ellipsis !important;
-    flex: 1 1 auto !important;
-    min-width: 0 !important;
-  }
-
-  .chrono-ext-log-time {
-    font-size: 10.5px !important;
-    font-weight: 600 !important;
-    color: #475569 !important;
-    background: #e2e8f0 !important;
-    padding: 1px 5px !important;
-    border-radius: 4px !important;
-    white-space: nowrap !important;
-    margin-left: auto !important;
-    flex-shrink: 0 !important;
-  }
-
-  .chrono-ext-history-btn {
-    background: #e2e8f0 !important;
-    color: #475569 !important;
-    border: 1px solid #cbd5e1 !important;
-    border-radius: 4px !important;
-    font-size: 10px !important;
     font-weight: 700 !important;
-    padding: 1px 5px !important;
-    cursor: pointer !important;
-    flex-shrink: 0 !important;
-    line-height: 14px !important;
+    color: #0f172a !important;
+    font-size: 13px !important;
   }
 
-  .chrono-ext-history-btn:hover {
-    background: #cbd5e1 !important;
-  }
-
-  .chrono-ext-history-dropdown {
-    margin-top: 4px !important;
-    padding-top: 4px !important;
-    border-top: 1px dashed #cbd5e1 !important;
-    display: flex !important;
-    flex-direction: column !important;
-    gap: 3px !important;
-  }
-
-  .chrono-ext-history-item {
-    display: flex !important;
-    align-items: center !important;
-    gap: 6px !important;
-    font-size: 11px !important;
-    color: #64748b !important;
+  .chrono-ext-log-detail {
+    font-size: 11.5px !important;
+    color: #475569 !important;
+    margin-top: 2px !important;
+    line-height: 1.35 !important;
+    white-space: normal !important;
+    word-break: break-word !important;
+    overflow: visible !important;
   }
 
   /* Consignment Details & Chosen Trip Card Grids */
@@ -972,28 +977,80 @@
   }
 
   /* Trip Details & Consignment Details Tabs & Header Actions Wrapping */
-  [class*="tableContainer-"] .ant-tabs-nav,
-  .ant-tabs-top > .ant-tabs-nav,
-  [class*="tabsCardsContainer-"] .ant-tabs-nav {
+  /* Trip Details & Consignment Details Tabs & Header Actions */
+  .ant-tabs-nav,
+  [role="tablist"].ant-tabs-nav,
+  [class*="tabsContainer-"] .ant-tabs-nav,
+  .ant-tabs-top > .ant-tabs-nav {
+    display: flex !important;
+    flex-direction: row !important;
+    align-items: center !important;
+    justify-content: flex-start !important;
+    width: 100% !important;
+    max-width: 100% !important;
+    background: #ffffff !important;
+    border-bottom: 1px solid #e2e8f0 !important;
+    box-sizing: border-box !important;
+    margin-bottom: 8px !important;
+    padding: 0 !important;
+  }
+
+  div:has(> [class*="tabsContainer-"]),
+  div:has(> [class*="tabDataContainer-"]) {
     display: flex !important;
     flex-direction: column !important;
+    justify-content: flex-start !important;
+    height: auto !important;
+    min-height: 0 !important;
+  }
+
+  /* Stack tabs cleanly above extra content whenever extra content exists (Trip Manager Map Edit & Chosen Trip toolbar) */
+  .ant-tabs-nav:has(.ant-tabs-extra-content),
+  [class*="tableContainer-"] .ant-tabs-nav:has(.ant-tabs-extra-content) {
+    flex-direction: column !important;
     align-items: stretch !important;
-    width: 100% !important;
-    margin-bottom: 8px !important;
   }
 
   .ant-tabs-nav-wrap {
+    flex: 1 1 auto !important;
+    min-width: 0 !important;
     width: 100% !important;
-    max-width: 100vw !important;
+    max-width: 100% !important;
     overflow-x: auto !important;
     -webkit-overflow-scrolling: touch !important;
-    padding-bottom: 4px !important;
+    padding: 4px 6px !important;
+    background: transparent !important;
+    border-bottom: none !important;
+  }
+
+  .ant-tabs-nav-wrap-ping-left::before,
+  .ant-tabs-nav-wrap-ping-right::after {
+    display: none !important;
+    opacity: 0 !important;
+  }
+
+  .ant-tabs-ink-bar {
+    display: none !important;
+  }
+
+  .ant-tabs-nav-operations {
+    display: none !important;
+  }
+
+  /* Hide desktop-only density/font size settings bar on mobile */
+  [class*="setFontSize"],
+  div:has(> [class*="setFontSize"]) {
+    display: none !important;
+    height: 0 !important;
+    margin: 0 !important;
+    padding: 0 !important;
   }
 
   .ant-tabs-nav-list {
     display: flex !important;
     flex-wrap: nowrap !important;
     gap: 6px !important;
+    transform: none !important;
   }
 
   .ant-tabs-tab {
@@ -1008,21 +1065,348 @@
 
   .ant-tabs-extra-content {
     width: 100% !important;
+    max-width: 100% !important;
+    display: flex !important;
+    flex-wrap: wrap !important;
+    align-items: center !important;
+    justify-content: flex-start !important;
+    gap: 8px !important;
+    padding: 4px 8px 6px 8px !important;
+    box-sizing: border-box !important;
+  }
+
+  .ant-tabs-extra-content:has(input) {
+    width: 100% !important;
     display: flex !important;
     flex-wrap: wrap !important;
     align-items: center !important;
     justify-content: space-between !important;
     gap: 8px !important;
-    margin-top: 6px !important;
-    padding: 2px 4px !important;
+    margin-top: 2px !important;
+    padding: 4px 8px 8px 8px !important;
   }
 
+  .ant-tabs-extra-content:has(input) > div {
+    display: flex !important;
+    flex-wrap: wrap !important;
+    align-items: center !important;
+    justify-content: space-between !important;
+    gap: 8px !important;
+    width: 100% !important;
+  }
+
+  .ant-tabs-extra-content:has(input) .ant-input-affix-wrapper,
   .ant-tabs-extra-content input,
   .ant-tabs-extra-content .ant-input-search {
     max-width: 100% !important;
-    flex: 1 1 180px !important;
+    flex: 1 1 100% !important;
+    width: 100% !important;
+    margin-right: 0 !important;
     height: 38px !important;
     border-radius: 8px !important;
+  }
+
+  .ant-tabs-extra-content .ant-pagination,
+  .ant-tabs-extra-content [class*="container-"]:has(.anticon-left, .anticon-right, .anticon-vertical-right),
+  [class*="rightItems-"] [class*="container-"]:has(.anticon-left, .anticon-right, .anticon-vertical-right) {
+    display: inline-flex !important;
+    flex-direction: row !important;
+    flex-wrap: nowrap !important;
+    align-items: center !important;
+    width: auto !important;
+    max-width: none !important;
+    height: auto !important;
+    flex: 0 0 auto !important;
+    gap: 8px !important;
+    margin: 0 !important;
+  }
+
+  /* Single-date & navbar range picker full display + single-line Rider Transactions bar */
+  [class*="navbarDateFilter-"] .ant-picker-range {
+    min-width: 210px !important;
+    max-width: 240px !important;
+    width: auto !important;
+  }
+
+  [class*="navbarDateFilter-"] .ant-picker-range input {
+    max-width: 86px !important;
+    min-width: 72px !important;
+    width: 78px !important;
+  }
+
+  [class*="manageTransactions-"] {
+    display: inline-flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+    white-space: nowrap !important;
+    width: auto !important;
+    font-size: 12px !important;
+    padding: 6px 10px !important;
+    margin: 4px 6px 4px 0 !important;
+  }
+
+  .ant-picker:not(.ant-picker-range) {
+    min-width: 124px !important;
+    max-width: none !important;
+    flex-shrink: 0 !important;
+  }
+
+  .ant-picker:not(.ant-picker-range) .ant-picker-input {
+    width: auto !important;
+    min-width: 88px !important;
+  }
+
+  .ant-picker:not(.ant-picker-range) input,
+  .ant-picker:not(.ant-picker-range) .ant-picker-input > input {
+    max-width: 100px !important;
+    min-width: 84px !important;
+    width: 88px !important;
+  }
+
+  .ant-table-cell-fix-right,
+  .ant-table-cell-fix-right-first,
+  .ant-table-thead th.ant-table-cell-fix-right,
+  .ant-table-thead th.ant-table-cell-fix-right-first {
+    position: static !important;
+    right: auto !important;
+    box-shadow: none !important;
+  }
+
+  [class*="actionsBar-"],
+  [class*="actionBar-"],
+  [class*="rightItems-"] {
+    display: flex !important;
+    flex-direction: row !important;
+    flex-wrap: nowrap !important;
+    overflow-x: auto !important;
+    overflow-y: hidden !important;
+    -webkit-overflow-scrolling: touch !important;
+    gap: 8px !important;
+    padding: 6px 10px !important;
+    align-items: center !important;
+  }
+
+  /* ── 17. Consignment Details Sub-Tabs Responsive Engine ── */
+
+  /* Universal Table Container in Detail Sub-Tabs */
+  [class*="tabDataContainer-"] .ant-table-wrapper,
+  [class*="tabsCardsContainer-"] .ant-table-wrapper,
+  [class*="tabDataContainer-"] .ant-spin-container,
+  [class*="tabsCardsContainer-"] .ant-spin-container,
+  [class*="tabDataContainer-"] .ant-table-container,
+  [class*="tabsCardsContainer-"] .ant-table-container {
+    width: 100% !important;
+    max-width: 100% !important;
+    overflow-x: auto !important;
+    -webkit-overflow-scrolling: touch !important;
+    border-radius: 10px !important;
+  }
+
+  /* Wrap tables in card container with soft border */
+  [class*="tabDataContainer-"] .ant-table-wrapper,
+  [class*="tabsCardsContainer-"] .ant-table-wrapper {
+    background: #ffffff !important;
+    border: 1px solid #e2e8f0 !important;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05) !important;
+    margin-top: 8px !important;
+    margin-bottom: 12px !important;
+  }
+
+  [class*="tabDataContainer-"] .ant-table,
+  [class*="tabsCardsContainer-"] .ant-table,
+  [class*="tabDataContainer-"] .ant-table table,
+  [class*="tabsCardsContainer-"] .ant-table table {
+    table-layout: auto !important;
+    width: max-content !important;
+    min-width: 100% !important;
+    font-size: 13px !important;
+  }
+
+  [class*="tabDataContainer-"] .ant-table col,
+  [class*="tabsCardsContainer-"] .ant-table col {
+    width: auto !important;
+  }
+
+  /* Legible cells with nowrap so codes and values never split */
+  [class*="tabDataContainer-"] .ant-table-thead th,
+  [class*="tabDataContainer-"] .ant-table-thead th > div,
+  [class*="tabsCardsContainer-"] .ant-table-thead th,
+  [class*="tabsCardsContainer-"] .ant-table-thead th > div {
+    width: auto !important;
+    min-width: 90px !important;
+    max-width: none !important;
+    white-space: nowrap !important;
+    text-overflow: clip !important;
+    overflow: visible !important;
+    background: #f8fafc !important;
+    color: #475569 !important;
+    font-weight: 700 !important;
+    font-size: 12px !important;
+    text-transform: uppercase !important;
+    letter-spacing: 0.3px !important;
+    padding: 10px 12px !important;
+    border-bottom: 1px solid #e2e8f0 !important;
+  }
+
+  [class*="tabDataContainer-"] .ant-table-tbody td,
+  [class*="tabDataContainer-"] .ant-table-tbody td > div,
+  [class*="tabsCardsContainer-"] .ant-table-tbody td,
+  [class*="tabsCardsContainer-"] .ant-table-tbody td > div {
+    width: auto !important;
+    white-space: nowrap !important;
+    text-overflow: clip !important;
+    overflow: visible !important;
+    padding: 10px 12px !important;
+    font-size: 13px !important;
+    color: #1e293b !important;
+    border-bottom: 1px solid #f1f5f9 !important;
+  }
+
+  /* Specific column minimum widths for Piece Details & Tracking (e.g. MRJN0035983081A) */
+  [class*="tabDataContainer-"] .ant-table td:nth-child(2),
+  [class*="tabDataContainer-"] .ant-table th:nth-child(2),
+  [class*="tabDataContainer-"] .ant-table td:nth-child(2) > div,
+  [class*="tabDataContainer-"] .ant-table th:nth-child(2) > div {
+    min-width: 180px !important;
+    font-weight: 600 !important;
+    color: #0088ce !important;
+  }
+
+  [class*="tabDataContainer-"] .ant-table td:nth-child(3),
+  [class*="tabDataContainer-"] .ant-table th:nth-child(3),
+  [class*="tabDataContainer-"] .ant-table td:nth-child(3) > div,
+  [class*="tabDataContainer-"] .ant-table th:nth-child(3) > div {
+    min-width: 150px !important;
+  }
+
+  /* Detail Page Action Bars (Custom view, Download/Export, etc.) */
+  [class*="tabDataContainer-"] [class*="action"],
+  [class*="tabDataContainer-"] [class*="buttonContainer"],
+  [class*="tabDataContainer-"] [class*="toolsContainer"],
+  [class*="tabDataContainer-"] > div:has(button),
+  [class*="tabDataContainer-"] > div:has(.ant-btn) {
+    display: flex !important;
+    align-items: center !important;
+    justify-content: space-between !important;
+    gap: 8px !important;
+    margin-bottom: 8px !important;
+    padding: 2px 4px !important;
+  }
+
+  [class*="tabDataContainer-"] button,
+  [class*="tabDataContainer-"] .ant-btn {
+    min-height: 38px !important;
+    border-radius: 8px !important;
+    font-size: 13px !important;
+    font-weight: 600 !important;
+    padding: 0 14px !important;
+    touch-action: manipulation !important;
+  }
+
+  /* Consignment Logs Timeline Modernization */
+  [class*="tabDataContainer-"] .ant-timeline {
+    padding: 12px 6px 12px 10px !important;
+  }
+
+  [class*="tabDataContainer-"] .ant-timeline-item {
+    padding-bottom: 18px !important;
+  }
+
+  [class*="tabDataContainer-"] .ant-timeline-item-head {
+    width: 12px !important;
+    height: 12px !important;
+    border-width: 2.5px !important;
+  }
+
+  [class*="tabDataContainer-"] .ant-timeline-item-content {
+    margin-left: 18px !important;
+    top: -4px !important;
+  }
+
+  [class*="tabDataContainer-"] .ant-timeline-item-content .ant-row {
+    display: flex !important;
+    flex-direction: column !important;
+    gap: 6px !important;
+    margin: 0 !important;
+  }
+
+  [class*="tabDataContainer-"] .ant-timeline-item-content .ant-col-6,
+  [class*="tabDataContainer-"] .ant-timeline-item-content .ant-col-18,
+  [class*="tabDataContainer-"] .ant-timeline-item-content .ant-col-24,
+  [class*="tabDataContainer-"] .ant-timeline-item-content .ant-col {
+    width: 100% !important;
+    max-width: 100% !important;
+    flex: 0 0 100% !important;
+    padding: 0 !important;
+  }
+
+  /* Timestamp & event name on top of log card */
+  [class*="tabDataContainer-"] [class*="eventTime-"] {
+    font-size: 12px !important;
+    font-weight: 700 !important;
+    color: #0088ce !important;
+    margin-bottom: 2px !important;
+    display: flex !important;
+    flex-wrap: wrap !important;
+    gap: 4px 8px !important;
+    align-items: center !important;
+  }
+
+  /* Log Details Card */
+  [class*="tabDataContainer-"] .ant-collapse-item,
+  [class*="tabDataContainer-"] [class*="timelineEvent-"],
+  [class*="tabDataContainer-"] .ant-timeline-item-content [class*="card"] {
+    background: #ffffff !important;
+    border: 1px solid #e2e8f0 !important;
+    border-radius: 10px !important;
+    padding: 10px 14px !important;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.04) !important;
+    width: 100% !important;
+    box-sizing: border-box !important;
+  }
+
+  [class*="tabDataContainer-"] [class*="timelineEvent-"] {
+    display: flex !important;
+    flex-direction: column !important;
+    gap: 4px !important;
+  }
+
+  [class*="tabDataContainer-"] [class*="timelineEvent-"] > div {
+    width: 100% !important;
+  }
+
+  [class*="tabDataContainer-"] [class*="timelineEventHeader-"] {
+    font-weight: 700 !important;
+    color: #475569 !important;
+    font-size: 13px !important;
+  }
+
+  [class*="tabDataContainer-"] .ant-collapse-header {
+    padding: 6px 0 !important;
+  }
+
+  [class*="tabDataContainer-"] [class*="timelineEvent-"] p {
+    margin-bottom: 2px !important;
+    font-size: 13px !important;
+    line-height: 1.4 !important;
+    text-indent: 0 !important;
+    text-align: left !important;
+    padding-left: 0 !important;
+  }
+
+  /* Empty State Enhancement */
+  [class*="tabDataContainer-"] .ant-empty {
+    margin: 32px 0 !important;
+    padding: 16px !important;
+    background: #ffffff !important;
+    border-radius: 10px !important;
+    border: 1px dashed #cbd5e1 !important;
+  }
+
+  [class*="tabDataContainer-"] .ant-empty-description {
+    font-size: 13.5px !important;
+    color: #64748b !important;
+    font-weight: 500 !important;
   }
 }
 

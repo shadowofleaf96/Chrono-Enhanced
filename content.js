@@ -217,18 +217,17 @@
   }
 
   /**
-   * Build a single-line status row with inline details and expandable history.
-   * @param {Array<{status, color, time, reason, worker, hub}>} entries
+   * Build a full multi-entry status timeline (up to 3 recent logs) so every parcel shows full details.
+   * @param {Array<{status, color, time, reason, worker, hub, fullStatus}>} entries
    * @param {HTMLElement|null} cnHeader - optional header to host attempt/COD badges
    */
   function createStatusTimeline(entries, cnHeader = null) {
-    // If cnHeader is provided, place attempt/COD badges inline in the header to save vertical space
     if (cnHeader && entries) {
       let badgesContainer = cnHeader.querySelector(".chrono-cn-badges");
       if (!badgesContainer) {
         badgesContainer = document.createElement("div");
         badgesContainer.className = "chrono-cn-badges";
-        badgesContainer.style.cssText = "display: flex; gap: 4px; align-items: center; margin-left: auto;";
+        badgesContainer.style.cssText = "display: flex; flex-wrap: wrap; gap: 4px; align-items: center; margin-left: auto;";
         cnHeader.appendChild(badgesContainer);
       }
       badgesContainer.innerHTML = "";
@@ -249,20 +248,17 @@
     }
 
     const container = document.createElement("div");
-    container.className = "chrono-ext-status-timeline is-single-line";
+    container.className = "chrono-ext-status-timeline";
 
     if (!entries || entries.length === 0) {
-      container.innerHTML = `<span class="chrono-ext-status-text" style="color:#94a3b8; font-size:11.5px;">Aucun statut</span>`;
+      container.innerHTML = `<span class="chrono-ext-status-text" style="color:#94a3b8; font-size:12px;">Aucun statut</span>`;
       return container;
     }
 
-    const entry = entries[0];
-
-    // Fallback if cnHeader wasn't passed but badges exist
-    if (!cnHeader && ((entries.attempts && entries.attempts !== '0') || entries.codAmount)) {
+    if (!cnHeader && ((entries.attempts && entries.attempts !== '0') || (entries.codAmount && parseFloat(entries.codAmount) > 0))) {
       const topBadges = document.createElement("div");
       topBadges.className = "chrono-ext-top-badges";
-      topBadges.style.cssText = "display: flex; gap: 4px; align-items: center; margin-bottom: 2px;";
+      topBadges.style.cssText = "display: flex; flex-wrap: wrap; gap: 4px; align-items: center; margin-bottom: 4px;";
       if (entries.attempts && entries.attempts !== '0') {
         const attemptsBadge = document.createElement("span");
         attemptsBadge.className = "chrono-ext-attempts-badge";
@@ -278,97 +274,65 @@
       container.appendChild(topBadges);
     }
 
-    // Error/timeout badge fallback
-    if (entry.status === "Error" || entry.status === "Timeout" || entry.status === "Auth Error") {
-      const line = document.createElement("div");
-      line.className = "chrono-ext-status-line";
-      line.innerHTML = `
-        <span class="chrono-ext-log-dot" style="background:${entry.color || '#ef4444'}"></span>
-        <span class="chrono-ext-log-status" style="color:#ef4444">${entry.status}</span>
-      `;
-      container.appendChild(line);
-      return container;
+    for (let idx = 0; idx < entries.length; idx++) {
+      const entry = entries[idx];
+
+      if (entry.status === "Error" || entry.status === "Timeout" || entry.status === "Auth Error") {
+        const badge = document.createElement("div");
+        badge.className = "chrono-ext-status-badge";
+        badge.setAttribute("data-error", "true");
+        badge.innerHTML = `
+          <span class="chrono-ext-status-dot" style="background:${entry.color || '#ef4444'}"></span>
+          <span class="chrono-ext-status-text">${entry.status}</span>
+        `;
+        container.appendChild(badge);
+        continue;
+      }
+
+      const row = document.createElement("div");
+      row.className = "chrono-ext-log-entry";
+
+      const dot = document.createElement("span");
+      dot.className = "chrono-ext-log-dot";
+      dot.style.backgroundColor = entry.color || "#0088ce";
+
+      const content = document.createElement("div");
+      content.className = "chrono-ext-log-content";
+
+      const titleRow = document.createElement("div");
+      titleRow.className = "chrono-ext-log-title-row";
+
+      const statusEl = document.createElement("span");
+      statusEl.className = idx === 0 ? "chrono-ext-log-status is-current" : "chrono-ext-log-status";
+      statusEl.textContent = entry.status;
+      titleRow.appendChild(statusEl);
+
+      if (entry.time) {
+        const timeEl = document.createElement("span");
+        timeEl.className = "chrono-ext-log-time";
+        timeEl.textContent = entry.time;
+        titleRow.appendChild(timeEl);
+      }
+
+      content.appendChild(titleRow);
+
+      const details = [];
+      if (entry.reason) details.push(`Motif: ${entry.reason}`);
+      if (entry.worker) details.push(`Livreur: ${entry.worker}`);
+      if (entry.hub) details.push(`Hub: ${entry.hub}`);
+
+      if (details.length > 0) {
+        const detailEl = document.createElement("div");
+        detailEl.className = "chrono-ext-log-detail";
+        detailEl.textContent = details.join(" • ");
+        content.appendChild(detailEl);
+      }
+
+      row.appendChild(dot);
+      row.appendChild(content);
+      container.appendChild(row);
     }
 
-    // Build the ONE-LINE detailed status
-    const line = document.createElement("div");
-    line.className = "chrono-ext-status-line";
-
-    const dot = document.createElement("span");
-    dot.className = "chrono-ext-log-dot";
-    dot.style.backgroundColor = entry.color || "#0088ce";
-
-    const statusEl = document.createElement("span");
-    statusEl.className = "chrono-ext-log-status is-current";
-    statusEl.textContent = entry.status;
-
-    // Build detail inline string: reason, worker, hub
-    const details = [];
-    if (entry.reason) details.push(`Motif: ${entry.reason}`);
-    if (entry.worker) details.push(`Livreur: ${entry.worker}`);
-    if (entry.hub) details.push(`Hub: ${entry.hub}`);
-
-    line.appendChild(dot);
-    line.appendChild(statusEl);
-
-    if (details.length > 0) {
-      const detailEl = document.createElement("span");
-      detailEl.className = "chrono-ext-log-detail-inline";
-      detailEl.textContent = `(${details.join(" • ")})`;
-      line.appendChild(detailEl);
-    }
-
-    if (entry.time) {
-      const timeEl = document.createElement("span");
-      timeEl.className = "chrono-ext-log-time";
-      timeEl.textContent = entry.time;
-      line.appendChild(timeEl);
-    }
-
-    // If older history entries exist, add a compact toggle button (+N)
-    if (entries.length > 1) {
-      const toggleBtn = document.createElement("button");
-      toggleBtn.type = "button";
-      toggleBtn.className = "chrono-ext-history-btn";
-      toggleBtn.textContent = `+${entries.length - 1}`;
-      toggleBtn.title = "Voir l'historique complet";
-
-      let historyDropdown = null;
-      toggleBtn.addEventListener("click", (e) => {
-        e.preventDefault();
-        e.stopPropagation();
-        if (historyDropdown) {
-          historyDropdown.remove();
-          historyDropdown = null;
-          toggleBtn.textContent = `+${entries.length - 1}`;
-        } else {
-          historyDropdown = document.createElement("div");
-          historyDropdown.className = "chrono-ext-history-dropdown";
-          for (let i = 1; i < entries.length; i++) {
-            const h = entries[i];
-            const hRow = document.createElement("div");
-            hRow.className = "chrono-ext-history-item";
-            const hDetails = [];
-            if (h.reason) hDetails.push(`Motif: ${h.reason}`);
-            if (h.worker) hDetails.push(`Livreur: ${h.worker}`);
-            const hDetailsStr = hDetails.length > 0 ? ` (${hDetails.join(" • ")})` : "";
-            hRow.innerHTML = `
-              <span class="chrono-ext-log-dot" style="background:${h.color || '#94a3b8'}; width:6px; height:6px; min-width:6px;"></span>
-              <span style="font-weight:600;">${h.status}</span>
-              <span style="color:#64748b; font-size:11px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">${hDetailsStr}</span>
-              <span style="color:#94a3b8; font-size:10.5px; margin-left:auto; white-space:nowrap;">${h.time || ''}</span>
-            `;
-            historyDropdown.appendChild(hRow);
-          }
-          container.appendChild(historyDropdown);
-          toggleBtn.textContent = "▲";
-        }
-      });
-
-      line.appendChild(toggleBtn);
-    }
-
-    container.appendChild(line);
     return container;
   }
 
@@ -433,6 +397,21 @@
   // when it tries to re-render, preventing new scans from appearing.
 
   // ── Scanner Trigger Delegation ────────────────────────────
+  function isScannerTriggerElement(el) {
+    if (!el) return false;
+    if (el.classList.contains('ant-input-clear-icon') || el.querySelector('.ant-input-clear-icon, [data-icon="close-circle"]')) {
+      return false;
+    }
+    if (el.classList.contains('ant-input-suffix')) {
+      const hasScannerIcon = el.querySelector('[class*="scan" i], [class*="barcode" i], .anticon-scan, svg[data-icon*="scan" i], svg[data-icon*="barcode" i]');
+      const inScanModal = Boolean(el.closest('.ant-modal-content'));
+      if (!hasScannerIcon && !inScanModal) return false;
+    }
+    const text = (el.textContent || '').trim().toLowerCase();
+    if (text.includes('inscan at hub') || text.includes('outscan at hub') || text.includes('cns scanned') || text.includes('manifest')) return false;
+    return true;
+  }
+
   function hookScannerButtons(root = document) {
     if (!root) return;
     const triggers = root.querySelectorAll(
@@ -447,8 +426,7 @@
       'button[title*="scan" i]'
     );
     triggers.forEach(trigger => {
-      const text = (trigger.textContent || '').trim().toLowerCase();
-      if (text.includes('inscan at hub') || text.includes('outscan at hub') || text.includes('cns scanned') || text.includes('manifest')) return;
+      if (!isScannerTriggerElement(trigger)) return;
       trigger.style.cursor = 'pointer';
       trigger.style.minWidth = '44px';
       trigger.style.minHeight = '44px';
@@ -699,8 +677,25 @@
 
   // ── Row processing ────────────────────────────────────────
 
+  function findCnCellInRow(row) {
+    const tds = Array.from(row.querySelectorAll("td.ant-table-cell, td"));
+    if (tds.length === 0) return null;
+    for (const td of tds) {
+      if (td.classList.contains("ant-table-selection-column")) continue;
+      if (td.querySelector('input[type="checkbox"], input[type="radio"], .anticon-close, .anticon-delete')) continue;
+      const clone = td.cloneNode(true);
+      clone.querySelectorAll(".chrono-ext-cn-inner, .chrono-ext-status-container, .chrono-cn-header").forEach(el => el.remove());
+      const txt = (clone.textContent || "").trim();
+      if (!txt || /^\d{1,4}$/.test(txt)) continue;
+      if (/[a-zA-Z]{2,}[a-zA-Z0-9_-]*\d+/.test(txt) || /^[a-zA-Z0-9_-]{6,}$/.test(txt)) {
+        return td;
+      }
+    }
+    return tds.length >= 2 ? tds[1] : tds[0];
+  }
+
   function processTableRows(modal) {
-    const tbody = modal.querySelector(".ant-table-tbody");
+    const tbody = modal.querySelector(".ant-table-tbody") || modal.querySelector("tbody");
     if (!tbody) return;
 
     for (const row of tbody.querySelectorAll("tr")) {
@@ -708,98 +703,94 @@
         continue;
       }
 
-      const tds = Array.from(row.querySelectorAll("td.ant-table-cell"));
-      if (tds.length < 2) continue;
+      const cnTd = findCnCellInRow(row);
+      if (!cnTd) continue;
 
-      const cnTd = tds[1];
-      
-      // Don't read our own injected text if we are re-processing
-      // We extract the pure text content of the cell minus our container if it exists
       const clone = cnTd.cloneNode(true);
-      const existingContainer = clone.querySelector(".chrono-ext-status-container");
-      if (existingContainer) existingContainer.remove();
-      const existingHeader = clone.querySelector(".chrono-cn-header");
-      if (existingHeader) existingHeader.remove();
-      
+      clone.querySelectorAll(".chrono-ext-cn-inner, .chrono-ext-status-container, .chrono-cn-header").forEach(el => el.remove());
+
       const rawText = clone.textContent || "";
-      const cnCodeMatch = rawText.match(/[a-zA-Z0-9_-]+/);
+      const cnCodeMatch = rawText.match(/[a-zA-Z0-9_-]{4,}/);
       const cnCode = cnCodeMatch ? cnCodeMatch[0] : "";
       if (!cnCode) continue;
 
-      // Detect if React recycled this row for a different parcel
       const currentCn = row.getAttribute("data-chrono-cn");
       if (currentCn !== cnCode) {
         row.setAttribute("data-chrono-cn", cnCode);
         row.removeAttribute(ATTR_PROCESSED);
       }
 
-      // Check for our status container inside the cell
+      cnTd.classList.add("chrono-ext-cn-td");
+      cnTd.style.setProperty("white-space", "normal", "important");
+      cnTd.style.setProperty("overflow", "visible", "important");
+      cnTd.style.setProperty("vertical-align", "top", "important");
+
+      let inner = cnTd.querySelector(".chrono-ext-cn-inner");
       let statusContainer = cnTd.querySelector(".chrono-ext-status-container");
       let newlyCreated = false;
-      
-      if (!statusContainer) {
-        cnTd.classList.add("chrono-ext-cn-cell");
-        cnTd.style.display = "flex";
-        cnTd.style.flexDirection = "column";
-        cnTd.style.alignItems = "stretch";
-        cnTd.style.gap = "2px";
-        cnTd.style.padding = "4px 6px";
 
-        let cnHeader = cnTd.querySelector(".chrono-cn-header");
-        if (!cnHeader) {
-          cnHeader = document.createElement("div");
-          cnHeader.className = "chrono-cn-header";
-          cnHeader.innerHTML = `<span class="chrono-cn-code">${cnCode}</span><div class="chrono-cn-badges"></div>`;
-          
-          // Hide or remove native Shipsy child nodes so they never collide with status
-          Array.from(cnTd.childNodes).forEach(node => {
-            if (node.nodeType === Node.TEXT_NODE) {
-              node.remove();
-            } else if (node.nodeType === Node.ELEMENT_NODE && !node.classList.contains("chrono-cn-header") && !node.classList.contains("chrono-ext-status-container")) {
-              node.style.display = "none";
-            }
-          });
-          cnTd.prepend(cnHeader);
+      if (!inner || !statusContainer) {
+        if (!inner) {
+          inner = document.createElement("div");
+          inner.className = "chrono-ext-cn-inner";
+        } else {
+          inner.innerHTML = "";
         }
+
+        const cnHeader = document.createElement("div");
+        cnHeader.className = "chrono-cn-header";
+        cnHeader.innerHTML = `<span class="chrono-cn-code">${cnCode}</span><div class="chrono-cn-badges"></div>`;
 
         statusContainer = document.createElement("div");
         statusContainer.className = "chrono-ext-status-container";
         statusContainer.style.width = "100%";
-        cnTd.appendChild(statusContainer);
+
+        inner.appendChild(cnHeader);
+        inner.appendChild(statusContainer);
+
+        Array.from(cnTd.childNodes).forEach(node => {
+          if (node === inner) return;
+          if (node.nodeType === Node.TEXT_NODE) {
+            node.remove();
+          } else if (node.nodeType === Node.ELEMENT_NODE) {
+            node.style.display = "none";
+          }
+        });
+        if (!inner.parentElement) {
+          cnTd.prepend(inner);
+        }
         newlyCreated = true;
       }
 
-      // Hide any stray native nodes inserted by React during re-render
-      let cnHeader = cnTd.querySelector(".chrono-cn-header");
       Array.from(cnTd.childNodes).forEach(node => {
-        if (node !== cnHeader && node !== statusContainer) {
+        if (node !== inner) {
           if (node.nodeType === Node.TEXT_NODE) node.remove();
           else if (node.nodeType === Node.ELEMENT_NODE) node.style.display = "none";
         }
       });
 
-      // If we just recreated the container (due to React re-render) OR it's a completely new row
+      const codeSpan = inner.querySelector(".chrono-cn-code");
+      if (codeSpan && codeSpan.textContent !== cnCode) {
+        codeSpan.textContent = cnCode;
+      }
+
       if (newlyCreated || !row.hasAttribute(ATTR_PROCESSED)) {
         statusContainer.innerHTML = "";
-        let cnHeader = cnTd.querySelector(".chrono-cn-header");
-        
+        const cnHeader = inner.querySelector(".chrono-cn-header");
+
         if (statusCache.has(cnCode)) {
-          // Instantly restore from cache if React wiped it out
           statusContainer.appendChild(createStatusTimeline(statusCache.get(cnCode), cnHeader));
           row.setAttribute(ATTR_PROCESSED, "true");
         } else {
-          // Show loading state
           statusContainer.appendChild(createLoadingBadge());
-          
-          // Only trigger a new fetch if one hasn't been started for this row
+
           if (!row.hasAttribute(ATTR_PROCESSED)) {
             row.setAttribute(ATTR_PROCESSED, "true");
-            
+
             fetchParcelStatus(cnCode).then((entries) => {
-              // Verify this row is still showing the same CN code before updating
               if (row.getAttribute("data-chrono-cn") === cnCode) {
-                let currentContainer = row.querySelector(".chrono-ext-status-container");
-                let currentHeader = row.querySelector(".chrono-cn-header");
+                const currentContainer = row.querySelector(".chrono-ext-status-container");
+                const currentHeader = row.querySelector(".chrono-cn-header");
                 if (currentContainer) {
                   currentContainer.innerHTML = "";
                   currentContainer.appendChild(createStatusTimeline(entries, currentHeader));
@@ -3523,7 +3514,7 @@
     return Object.values(riderMap);
   }
 
-  // ── Global Internal Link Interceptor (Prevent blank target tab break) ─
+  // ── Global Internal Link & Trip Row Tap Interceptor (Prevent blank target tab break & expand touch target) ─
   document.addEventListener('click', (e) => {
     const link = e.target.closest('a');
     if (link) {
@@ -3531,6 +3522,40 @@
       if (href.startsWith('/') || href.includes('cross.chronodiali.ma') || href.includes('shipsy.io')) {
         if (link.getAttribute('target') === '_blank') {
           link.removeAttribute('target');
+        }
+      }
+      return;
+    }
+
+    if (e.target.closest('button, input, label, select, .ant-checkbox-wrapper, .ant-dropdown-trigger, [role="button"], .anticon')) {
+      return;
+    }
+
+    const cell = e.target.closest('td.ant-table-cell');
+    if (cell) {
+      const cellLink = cell.querySelector('a[href*="/trip/details/"], a[href*="/ops/details/"], a[href*="/reconciliation/"]');
+      if (cellLink) {
+        const href = cellLink.getAttribute('href');
+        if (href) {
+          cellLink.removeAttribute('target');
+          e.preventDefault();
+          e.stopPropagation();
+          cellLink.click();
+          return;
+        }
+      }
+
+      if (location.pathname.includes('/ops/retail/trip-manager')) {
+        const row = cell.closest('tr');
+        const rowTripLink = row ? row.querySelector('a[href*="/trip/details/"]') : null;
+        if (rowTripLink) {
+          const href = rowTripLink.getAttribute('href');
+          if (href && !href.endsWith('undefined')) {
+            rowTripLink.removeAttribute('target');
+            e.preventDefault();
+            e.stopPropagation();
+            rowTripLink.click();
+          }
         }
       }
     }

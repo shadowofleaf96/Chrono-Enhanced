@@ -223,8 +223,28 @@ class ChronoWebActivity : AppCompatActivity() {
                 isUserGesture: Boolean,
                 resultMsg: Message?
             ): Boolean {
+                val mainView = view ?: binding.webviewChrono
+                val tempWebView = WebView(mainView.context)
+                tempWebView.webViewClient = object : WebViewClient() {
+                    override fun shouldOverrideUrlLoading(
+                        v: WebView?,
+                        request: WebResourceRequest?
+                    ): Boolean {
+                        val url = request?.url?.toString() ?: return false
+                        if (url.startsWith("https://cross.chronodiali.ma") ||
+                            url.startsWith("https://projectxeuapi.shipsy.io") ||
+                            url.startsWith("/")
+                        ) {
+                            mainView.loadUrl(url)
+                        } else {
+                            try { startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(url))) } catch (_: Exception) {}
+                        }
+                        v?.destroy()
+                        return true
+                    }
+                }
                 val transport = resultMsg?.obj as? WebView.WebViewTransport
-                transport?.webView = view
+                transport?.webView = tempWebView
                 resultMsg?.sendToTarget()
                 return true
             }

@@ -250,18 +250,17 @@
   }
 
   /**
-   * Build a single-line status row with inline details and expandable history.
-   * @param {Array<{status, color, time, reason, worker, hub}>} entries
+   * Build a full multi-entry status timeline (up to 3 recent logs) so every parcel shows full details.
+   * @param {Array<{status, color, time, reason, worker, hub, fullStatus}>} entries
    * @param {HTMLElement|null} cnHeader - optional header to host attempt/COD badges
    */
   function createStatusTimeline(entries, cnHeader = null) {
-    // If cnHeader is provided, place attempt/COD badges inline in the header to save vertical space
     if (cnHeader && entries) {
       let badgesContainer = cnHeader.querySelector(".chrono-cn-badges");
       if (!badgesContainer) {
         badgesContainer = document.createElement("div");
         badgesContainer.className = "chrono-cn-badges";
-        badgesContainer.style.cssText = "display: flex; gap: 4px; align-items: center; margin-left: auto;";
+        badgesContainer.style.cssText = "display: flex; flex-wrap: wrap; gap: 4px; align-items: center; margin-left: auto;";
         cnHeader.appendChild(badgesContainer);
       }
       badgesContainer.innerHTML = "";
@@ -282,20 +281,18 @@
     }
 
     const container = document.createElement("div");
-    container.className = "chrono-ext-status-timeline is-single-line";
+    container.className = "chrono-ext-status-timeline";
 
     if (!entries || entries.length === 0) {
-      container.innerHTML = `<span class="chrono-ext-status-text" style="color:#94a3b8; font-size:11.5px;">Aucun statut</span>`;
+      container.innerHTML = `<span class="chrono-ext-status-text" style="color:#94a3b8; font-size:12px;">Aucun statut</span>`;
       return container;
     }
 
-    const entry = entries[0];
-
     // Fallback if cnHeader wasn't passed but badges exist
-    if (!cnHeader && ((entries.attempts && entries.attempts !== '0') || entries.codAmount)) {
+    if (!cnHeader && ((entries.attempts && entries.attempts !== '0') || (entries.codAmount && parseFloat(entries.codAmount) > 0))) {
       const topBadges = document.createElement("div");
       topBadges.className = "chrono-ext-top-badges";
-      topBadges.style.cssText = "display: flex; gap: 4px; align-items: center; margin-bottom: 2px;";
+      topBadges.style.cssText = "display: flex; flex-wrap: wrap; gap: 4px; align-items: center; margin-bottom: 4px;";
       if (entries.attempts && entries.attempts !== '0') {
         const attemptsBadge = document.createElement("span");
         attemptsBadge.className = "chrono-ext-attempts-badge";
@@ -311,97 +308,65 @@
       container.appendChild(topBadges);
     }
 
-    // Error/timeout badge fallback
-    if (entry.status === "Error" || entry.status === "Timeout" || entry.status === "Auth Error") {
-      const line = document.createElement("div");
-      line.className = "chrono-ext-status-line";
-      line.innerHTML = `
-        <span class="chrono-ext-log-dot" style="background:${entry.color || '#ef4444'}"></span>
-        <span class="chrono-ext-log-status" style="color:#ef4444">${entry.status}</span>
-      `;
-      container.appendChild(line);
-      return container;
+    for (let idx = 0; idx < entries.length; idx++) {
+      const entry = entries[idx];
+
+      if (entry.status === "Error" || entry.status === "Timeout" || entry.status === "Auth Error") {
+        const badge = document.createElement("div");
+        badge.className = "chrono-ext-status-badge";
+        badge.setAttribute("data-error", "true");
+        badge.innerHTML = `
+          <span class="chrono-ext-status-dot" style="background:${entry.color || '#ef4444'}"></span>
+          <span class="chrono-ext-status-text">${entry.status}</span>
+        `;
+        container.appendChild(badge);
+        continue;
+      }
+
+      const row = document.createElement("div");
+      row.className = "chrono-ext-log-entry";
+
+      const dot = document.createElement("span");
+      dot.className = "chrono-ext-log-dot";
+      dot.style.backgroundColor = entry.color || "#0088ce";
+
+      const content = document.createElement("div");
+      content.className = "chrono-ext-log-content";
+
+      const titleRow = document.createElement("div");
+      titleRow.className = "chrono-ext-log-title-row";
+
+      const statusEl = document.createElement("span");
+      statusEl.className = idx === 0 ? "chrono-ext-log-status is-current" : "chrono-ext-log-status";
+      statusEl.textContent = entry.status;
+      titleRow.appendChild(statusEl);
+
+      if (entry.time) {
+        const timeEl = document.createElement("span");
+        timeEl.className = "chrono-ext-log-time";
+        timeEl.textContent = entry.time;
+        titleRow.appendChild(timeEl);
+      }
+
+      content.appendChild(titleRow);
+
+      const details = [];
+      if (entry.reason) details.push(`Motif: ${entry.reason}`);
+      if (entry.worker) details.push(`Livreur: ${entry.worker}`);
+      if (entry.hub) details.push(`Hub: ${entry.hub}`);
+
+      if (details.length > 0) {
+        const detailEl = document.createElement("div");
+        detailEl.className = "chrono-ext-log-detail";
+        detailEl.textContent = details.join(" • ");
+        content.appendChild(detailEl);
+      }
+
+      row.appendChild(dot);
+      row.appendChild(content);
+      container.appendChild(row);
     }
 
-    // Build the ONE-LINE detailed status
-    const line = document.createElement("div");
-    line.className = "chrono-ext-status-line";
-
-    const dot = document.createElement("span");
-    dot.className = "chrono-ext-log-dot";
-    dot.style.backgroundColor = entry.color || "#0088ce";
-
-    const statusEl = document.createElement("span");
-    statusEl.className = "chrono-ext-log-status is-current";
-    statusEl.textContent = entry.status;
-
-    // Build detail inline string: reason, worker, hub
-    const details = [];
-    if (entry.reason) details.push(`Motif: ${entry.reason}`);
-    if (entry.worker) details.push(`Livreur: ${entry.worker}`);
-    if (entry.hub) details.push(`Hub: ${entry.hub}`);
-
-    line.appendChild(dot);
-    line.appendChild(statusEl);
-
-    if (details.length > 0) {
-      const detailEl = document.createElement("span");
-      detailEl.className = "chrono-ext-log-detail-inline";
-      detailEl.textContent = `(${details.join(" • ")})`;
-      line.appendChild(detailEl);
-    }
-
-    if (entry.time) {
-      const timeEl = document.createElement("span");
-      timeEl.className = "chrono-ext-log-time";
-      timeEl.textContent = entry.time;
-      line.appendChild(timeEl);
-    }
-
-    // If older history entries exist, add a compact toggle button (+N)
-    if (entries.length > 1) {
-      const toggleBtn = document.createElement("button");
-      toggleBtn.type = "button";
-      toggleBtn.className = "chrono-ext-history-btn";
-      toggleBtn.textContent = `+${entries.length - 1}`;
-      toggleBtn.title = "Voir l'historique complet";
-
-      let historyDropdown = null;
-      toggleBtn.addEventListener("click", (e) => {
-        e.preventDefault();
-        e.stopPropagation();
-        if (historyDropdown) {
-          historyDropdown.remove();
-          historyDropdown = null;
-          toggleBtn.textContent = `+${entries.length - 1}`;
-        } else {
-          historyDropdown = document.createElement("div");
-          historyDropdown.className = "chrono-ext-history-dropdown";
-          for (let i = 1; i < entries.length; i++) {
-            const h = entries[i];
-            const hRow = document.createElement("div");
-            hRow.className = "chrono-ext-history-item";
-            const hDetails = [];
-            if (h.reason) hDetails.push(`Motif: ${h.reason}`);
-            if (h.worker) hDetails.push(`Livreur: ${h.worker}`);
-            const hDetailsStr = hDetails.length > 0 ? ` (${hDetails.join(" • ")})` : "";
-            hRow.innerHTML = `
-              <span class="chrono-ext-log-dot" style="background:${h.color || '#94a3b8'}; width:6px; height:6px; min-width:6px;"></span>
-              <span style="font-weight:600;">${h.status}</span>
-              <span style="color:#64748b; font-size:11px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">${hDetailsStr}</span>
-              <span style="color:#94a3b8; font-size:10.5px; margin-left:auto; white-space:nowrap;">${h.time || ''}</span>
-            `;
-            historyDropdown.appendChild(hRow);
-          }
-          container.appendChild(historyDropdown);
-          toggleBtn.textContent = "▲";
-        }
-      });
-
-      line.appendChild(toggleBtn);
-    }
-
-    container.appendChild(line);
     return container;
   }
 
@@ -466,6 +431,22 @@
   // when it tries to re-render, preventing new scans from appearing.
 
   // ── Scanner Trigger Delegation ────────────────────────────
+  function isScannerTriggerElement(el) {
+    if (!el) return false;
+    // Never hijack Ant Design clear buttons ("close-circle") on search inputs
+    if (el.classList.contains('ant-input-clear-icon') || el.querySelector('.ant-input-clear-icon, [data-icon="close-circle"]')) {
+      return false;
+    }
+    if (el.classList.contains('ant-input-suffix')) {
+      const hasScannerIcon = el.querySelector('[class*="scan" i], [class*="barcode" i], .anticon-scan, svg[data-icon*="scan" i], svg[data-icon*="barcode" i]');
+      const inScanModal = Boolean(el.closest('.ant-modal-content'));
+      if (!hasScannerIcon && !inScanModal) return false;
+    }
+    const text = (el.textContent || '').trim().toLowerCase();
+    if (text.includes('inscan at hub') || text.includes('outscan at hub') || text.includes('cns scanned') || text.includes('manifest')) return false;
+    return true;
+  }
+
   function hookScannerButtons(root = document) {
     if (!root) return;
     const triggers = root.querySelectorAll(
@@ -480,8 +461,7 @@
       'button[title*="scan" i]'
     );
     triggers.forEach(trigger => {
-      const text = (trigger.textContent || '').trim().toLowerCase();
-      if (text.includes('inscan at hub') || text.includes('outscan at hub') || text.includes('cns scanned') || text.includes('manifest')) return;
+      if (!isScannerTriggerElement(trigger)) return;
       trigger.style.cursor = 'pointer';
       trigger.style.minWidth = '44px';
       trigger.style.minHeight = '44px';
@@ -525,9 +505,7 @@
           'button[aria-label*="scan" i], ' +
           'button[title*="scan" i]'
         );
-        if (trigger) {
-          const text = (trigger.textContent || '').trim().toLowerCase();
-          if (text.includes('inscan at hub') || text.includes('outscan at hub') || text.includes('cns scanned') || text.includes('manifest')) return;
+        if (trigger && isScannerTriggerElement(trigger)) {
           e.preventDefault();
           e.stopImmediatePropagation();
           appBridge.launchScanner();
@@ -732,8 +710,26 @@
 
   // ── Row processing ────────────────────────────────────────
 
+  function findCnCellInRow(row) {
+    const tds = Array.from(row.querySelectorAll("td.ant-table-cell, td"));
+    if (tds.length === 0) return null;
+    for (const td of tds) {
+      if (td.classList.contains("ant-table-selection-column")) continue;
+      if (td.querySelector('input[type="checkbox"], input[type="radio"], .anticon-close, .anticon-delete')) continue;
+      const clone = td.cloneNode(true);
+      clone.querySelectorAll(".chrono-ext-cn-inner, .chrono-ext-status-container, .chrono-cn-header").forEach(el => el.remove());
+      const txt = (clone.textContent || "").trim();
+      if (!txt || /^\d{1,4}$/.test(txt)) continue;
+      // Prefer tracking codes containing letters + digits (e.g. MRJN0035983081A, CD2702313134)
+      if (/[a-zA-Z]{2,}[a-zA-Z0-9_-]*\d+/.test(txt) || /^[a-zA-Z0-9_-]{6,}$/.test(txt)) {
+        return td;
+      }
+    }
+    return tds.length >= 2 ? tds[1] : tds[0];
+  }
+
   function processTableRows(modal) {
-    const tbody = modal.querySelector(".ant-table-tbody");
+    const tbody = modal.querySelector(".ant-table-tbody") || modal.querySelector("tbody");
     if (!tbody) return;
 
     for (const row of tbody.querySelectorAll("tr")) {
@@ -741,21 +737,15 @@
         continue;
       }
 
-      const tds = Array.from(row.querySelectorAll("td.ant-table-cell"));
-      if (tds.length < 2) continue;
+      const cnTd = findCnCellInRow(row);
+      if (!cnTd) continue;
 
-      const cnTd = tds[1];
-      
-      // Don't read our own injected text if we are re-processing
-      // We extract the pure text content of the cell minus our container if it exists
+      // Read clean CN code without our injected wrapper
       const clone = cnTd.cloneNode(true);
-      const existingContainer = clone.querySelector(".chrono-ext-status-container");
-      if (existingContainer) existingContainer.remove();
-      const existingHeader = clone.querySelector(".chrono-cn-header");
-      if (existingHeader) existingHeader.remove();
-      
+      clone.querySelectorAll(".chrono-ext-cn-inner, .chrono-ext-status-container, .chrono-cn-header").forEach(el => el.remove());
+
       const rawText = clone.textContent || "";
-      const cnCodeMatch = rawText.match(/[a-zA-Z0-9_-]+/);
+      const cnCodeMatch = rawText.match(/[a-zA-Z0-9_-]{4,}/);
       const cnCode = cnCodeMatch ? cnCodeMatch[0] : "";
       if (!cnCode) continue;
 
@@ -766,73 +756,81 @@
         row.removeAttribute(ATTR_PROCESSED);
       }
 
-      // Check for our status container inside the cell
+      // Ensure safe wrapping on td itself without breaking table-cell geometry
+      cnTd.classList.add("chrono-ext-cn-td");
+      cnTd.style.setProperty("white-space", "normal", "important");
+      cnTd.style.setProperty("overflow", "visible", "important");
+      cnTd.style.setProperty("vertical-align", "top", "important");
+
+      let inner = cnTd.querySelector(".chrono-ext-cn-inner");
       let statusContainer = cnTd.querySelector(".chrono-ext-status-container");
       let newlyCreated = false;
-      
-      if (!statusContainer) {
-        cnTd.classList.add("chrono-ext-cn-cell");
-        cnTd.style.display = "flex";
-        cnTd.style.flexDirection = "column";
-        cnTd.style.alignItems = "stretch";
-        cnTd.style.gap = "2px";
-        cnTd.style.padding = "4px 6px";
 
-        let cnHeader = cnTd.querySelector(".chrono-cn-header");
-        if (!cnHeader) {
-          cnHeader = document.createElement("div");
-          cnHeader.className = "chrono-cn-header";
-          cnHeader.innerHTML = `<span class="chrono-cn-code">${cnCode}</span><div class="chrono-cn-badges"></div>`;
-          
-          // Hide or remove native Shipsy child nodes so they never collide with status
-          Array.from(cnTd.childNodes).forEach(node => {
-            if (node.nodeType === Node.TEXT_NODE) {
-              node.remove();
-            } else if (node.nodeType === Node.ELEMENT_NODE && !node.classList.contains("chrono-cn-header") && !node.classList.contains("chrono-ext-status-container")) {
-              node.style.display = "none";
-            }
-          });
-          cnTd.prepend(cnHeader);
+      if (!inner || !statusContainer) {
+        if (!inner) {
+          inner = document.createElement("div");
+          inner.className = "chrono-ext-cn-inner";
+        } else {
+          inner.innerHTML = "";
         }
+
+        const cnHeader = document.createElement("div");
+        cnHeader.className = "chrono-cn-header";
+        cnHeader.innerHTML = `<span class="chrono-cn-code">${cnCode}</span><div class="chrono-cn-badges"></div>`;
 
         statusContainer = document.createElement("div");
         statusContainer.className = "chrono-ext-status-container";
         statusContainer.style.width = "100%";
-        cnTd.appendChild(statusContainer);
+
+        inner.appendChild(cnHeader);
+        inner.appendChild(statusContainer);
+
+        // Hide native Shipsy child nodes so they never collide with our full status card
+        Array.from(cnTd.childNodes).forEach(node => {
+          if (node === inner) return;
+          if (node.nodeType === Node.TEXT_NODE) {
+            node.remove();
+          } else if (node.nodeType === Node.ELEMENT_NODE) {
+            node.style.display = "none";
+          }
+        });
+        if (!inner.parentElement) {
+          cnTd.prepend(inner);
+        }
         newlyCreated = true;
       }
 
-      // Hide any stray native nodes inserted by React during re-render
-      let cnHeader = cnTd.querySelector(".chrono-cn-header");
+      // Keep any stray native nodes hidden on React re-render
       Array.from(cnTd.childNodes).forEach(node => {
-        if (node !== cnHeader && node !== statusContainer) {
+        if (node !== inner) {
           if (node.nodeType === Node.TEXT_NODE) node.remove();
           else if (node.nodeType === Node.ELEMENT_NODE) node.style.display = "none";
         }
       });
 
-      // If we just recreated the container (due to React re-render) OR it's a completely new row
+      // Keep CN text updated in header
+      const codeSpan = inner.querySelector(".chrono-cn-code");
+      if (codeSpan && codeSpan.textContent !== cnCode) {
+        codeSpan.textContent = cnCode;
+      }
+
       if (newlyCreated || !row.hasAttribute(ATTR_PROCESSED)) {
         statusContainer.innerHTML = "";
-        let cnHeader = cnTd.querySelector(".chrono-cn-header");
-        
+        const cnHeader = inner.querySelector(".chrono-cn-header");
+
         if (statusCache.has(cnCode)) {
-          // Instantly restore from cache if React wiped it out
           statusContainer.appendChild(createStatusTimeline(statusCache.get(cnCode), cnHeader));
           row.setAttribute(ATTR_PROCESSED, "true");
         } else {
-          // Show loading state
           statusContainer.appendChild(createLoadingBadge());
-          
-          // Only trigger a new fetch if one hasn't been started for this row
+
           if (!row.hasAttribute(ATTR_PROCESSED)) {
             row.setAttribute(ATTR_PROCESSED, "true");
-            
+
             fetchParcelStatus(cnCode).then((entries) => {
-              // Verify this row is still showing the same CN code before updating
               if (row.getAttribute("data-chrono-cn") === cnCode) {
-                let currentContainer = row.querySelector(".chrono-ext-status-container");
-                let currentHeader = row.querySelector(".chrono-cn-header");
+                const currentContainer = row.querySelector(".chrono-ext-status-container");
+                const currentHeader = row.querySelector(".chrono-cn-header");
                 if (currentContainer) {
                   currentContainer.innerHTML = "";
                   currentContainer.appendChild(createStatusTimeline(entries, currentHeader));
@@ -1127,23 +1125,29 @@
             text-align: center !important;
           }
 
-          /* Status container and cards inside modal */
-          .chrono-ext-cn-cell {
+          /* Status container and full multi-entry cards inside modal */
+          .chrono-ext-cn-td {
+            white-space: normal !important;
+            overflow: visible !important;
+            vertical-align: top !important;
+            padding: 6px !important;
+          }
+          .chrono-ext-cn-inner {
             display: flex !important;
             flex-direction: column !important;
             align-items: stretch !important;
-            gap: 2px !important;
+            gap: 4px !important;
             width: 100% !important;
-            padding: 4px 6px !important;
             box-sizing: border-box !important;
           }
           .chrono-cn-header {
             display: flex !important;
             justify-content: space-between !important;
             align-items: center !important;
+            flex-wrap: wrap !important;
             width: 100% !important;
             gap: 6px !important;
-            padding-bottom: 1px !important;
+            padding-bottom: 2px !important;
           }
           .chrono-cn-code {
             font-weight: 700 !important;
@@ -1153,6 +1157,7 @@
           }
           .chrono-cn-badges {
             display: flex !important;
+            flex-wrap: wrap !important;
             align-items: center !important;
             gap: 4px !important;
             margin-left: auto !important;
@@ -1169,20 +1174,9 @@
             background: #f8fafc !important;
             border: 1px solid #e2e8f0 !important;
             border-radius: 6px !important;
-            padding: 3px 6px !important;
+            padding: 6px 8px !important;
+            gap: 4px !important;
             box-sizing: border-box !important;
-          }
-          .chrono-ext-status-timeline.is-single-line {
-            padding: 3px 6px !important;
-          }
-          .chrono-ext-status-line {
-            display: flex !important;
-            align-items: center !important;
-            gap: 6px !important;
-            width: 100% !important;
-            font-size: 12px !important;
-            line-height: 1.25 !important;
-            overflow: hidden !important;
           }
           .chrono-ext-attempts-badge {
             display: inline-flex !important;
@@ -1206,33 +1200,53 @@
             font-weight: 600 !important;
             padding: 1px 6px !important;
           }
+          .chrono-ext-log-entry {
+            display: flex !important;
+            align-items: flex-start !important;
+            gap: 8px !important;
+            width: 100% !important;
+            padding: 3px 0 !important;
+          }
+          .chrono-ext-log-entry:not(:last-child) {
+            border-bottom: 1px dashed #e2e8f0 !important;
+            padding-bottom: 5px !important;
+          }
           .chrono-ext-log-dot {
             display: inline-block !important;
-            width: 7px !important;
-            height: 7px !important;
-            min-width: 7px !important;
+            width: 9px !important;
+            height: 9px !important;
+            min-width: 9px !important;
             border-radius: 50% !important;
+            margin-top: 4px !important;
             flex-shrink: 0 !important;
             box-shadow: 0 0 0 1.5px rgba(255,255,255,0.9) !important;
           }
-          .chrono-ext-log-status {
-            font-size: 12.5px !important;
-            font-weight: 700 !important;
-            color: #1e293b !important;
-            white-space: nowrap !important;
-            flex-shrink: 0 !important;
-          }
-          .chrono-ext-log-status.is-current {
-            color: #0f172a !important;
-          }
-          .chrono-ext-log-detail-inline {
-            font-size: 11px !important;
-            color: #64748b !important;
-            white-space: nowrap !important;
-            overflow: hidden !important;
-            text-overflow: ellipsis !important;
+          .chrono-ext-log-content {
+            display: flex !important;
+            flex-direction: column !important;
             flex: 1 1 auto !important;
             min-width: 0 !important;
+          }
+          .chrono-ext-log-title-row {
+            display: flex !important;
+            justify-content: space-between !important;
+            align-items: flex-start !important;
+            width: 100% !important;
+            gap: 6px !important;
+          }
+          .chrono-ext-log-status {
+            font-size: 12.5px !important;
+            font-weight: 600 !important;
+            color: #334155 !important;
+            line-height: 1.35 !important;
+            white-space: normal !important;
+            word-break: break-word !important;
+            overflow: visible !important;
+          }
+          .chrono-ext-log-status.is-current {
+            font-weight: 700 !important;
+            color: #0f172a !important;
+            font-size: 13px !important;
           }
           .chrono-ext-log-time {
             font-size: 10.5px !important;
@@ -1242,38 +1256,16 @@
             padding: 1px 5px !important;
             border-radius: 4px !important;
             white-space: nowrap !important;
-            margin-left: auto !important;
             flex-shrink: 0 !important;
           }
-          .chrono-ext-history-btn {
-            background: #e2e8f0 !important;
+          .chrono-ext-log-detail {
+            font-size: 11.5px !important;
             color: #475569 !important;
-            border: 1px solid #cbd5e1 !important;
-            border-radius: 4px !important;
-            font-size: 10px !important;
-            font-weight: 700 !important;
-            padding: 1px 5px !important;
-            cursor: pointer !important;
-            flex-shrink: 0 !important;
-            line-height: 14px !important;
-          }
-          .chrono-ext-history-btn:hover {
-            background: #cbd5e1 !important;
-          }
-          .chrono-ext-history-dropdown {
-            margin-top: 4px !important;
-            padding-top: 4px !important;
-            border-top: 1px dashed #cbd5e1 !important;
-            display: flex !important;
-            flex-direction: column !important;
-            gap: 3px !important;
-          }
-          .chrono-ext-history-item {
-            display: flex !important;
-            align-items: center !important;
-            gap: 6px !important;
-            font-size: 11px !important;
-            color: #64748b !important;
+            margin-top: 2px !important;
+            line-height: 1.35 !important;
+            white-space: normal !important;
+            word-break: break-word !important;
+            overflow: visible !important;
           }
           .chrono-ext-status-badge {
             display: inline-flex !important;
@@ -2851,38 +2843,56 @@
     processTableRows(modal);
   }
 
+  let filterTogglePath = '';
   function ensureFilterToggle() {
-    if (!location.pathname.includes('/ops/consignments')) {
+    const isConsignments = location.pathname.includes('/ops/consignments');
+    const isTripManager = location.pathname.includes('/ops/retail/trip-manager');
+    if (!isConsignments && !isTripManager) {
       const existingBtn = document.getElementById('chrono-filter-toggle-btn');
       if (existingBtn) existingBtn.remove();
+      filterTogglePath = '';
       return;
     }
-    const filterWrapper = document.querySelector('[class*="filterBarWrapper-"]');
+
+    if (filterTogglePath !== location.pathname) {
+      const existingBtn = document.getElementById('chrono-filter-toggle-btn');
+      if (existingBtn) existingBtn.remove();
+      filterTogglePath = location.pathname;
+    }
+
+    let filterWrapper = document.querySelector('[class*="filterBarWrapper-"]');
+    if (!filterWrapper && isTripManager) {
+      const resetBtn = Array.from(document.querySelectorAll('button')).find(b => (b.textContent || '').includes('Reset All'));
+      filterWrapper = resetBtn ? resetBtn.closest('form, [class*="formContainer-"]') : document.querySelector('[class*="containerDefaultFilter-"] form');
+    }
     if (!filterWrapper) return;
-    
+
+    const actionsBar = document.querySelector('[class*="actionsBar-"]') ||
+                       document.querySelector('[class*="actionBar-"]') ||
+                       document.querySelector('[class*="rightItems-"]');
+
     let toggleBtn = document.getElementById('chrono-filter-toggle-btn');
     if (!toggleBtn) {
       toggleBtn = document.createElement('button');
       toggleBtn.id = 'chrono-filter-toggle-btn';
       toggleBtn.type = 'button';
-      toggleBtn.className = 'ant-btn ant-btn-sm';
-      toggleBtn.style.cssText = 'height: 38px; min-height: 38px; font-size: 13px; border-radius: 8px; background: #e6f7ff; border: 1.5px solid #0088CE; color: #0088CE; font-weight: 600; display: inline-flex; align-items: center; gap: 6px; cursor: pointer; flex: 0 0 auto; padding: 0 14px; margin-right: 6px; box-shadow: 0 1px 3px rgba(0,0,0,0.08); touch-action: manipulation;';
+      toggleBtn.className = 'ant-btn ant-btn-sm chrono-filter-toggle-btn';
+      toggleBtn.style.cssText = 'height: 38px; min-height: 38px; font-size: 13px; border-radius: 8px; background: #e6f7ff; border: 1.5px solid #0088CE; color: #0088CE; font-weight: 600; display: inline-flex; align-items: center; gap: 6px; cursor: pointer; flex: 0 0 auto; padding: 0 14px; margin-right: 4px; box-shadow: 0 1px 3px rgba(0,0,0,0.08); touch-action: manipulation;';
       toggleBtn.innerHTML = '🔍 Filtres <span style="font-size: 10px;">▼</span>';
-      
-      const actionsBar = document.querySelector('[class*="actionsBar-"]') || document.querySelector('[class*="actionBar-"]');
+
       if (actionsBar) {
         actionsBar.insertBefore(toggleBtn, actionsBar.firstChild);
       } else {
         filterWrapper.parentNode.insertBefore(toggleBtn, filterWrapper);
       }
-      
+
       // Collapsed by default on mobile so table is immediately visible without scrolling
       filterWrapper.classList.add('chrono-filters-hidden');
       filterWrapper.style.setProperty('display', 'none', 'important');
       const divider = filterWrapper.nextElementSibling;
-      const isDivider = divider && divider.className && divider.className.includes('filterActionDivider-');
+      const isDivider = divider && divider.className && typeof divider.className === 'string' && divider.className.includes('filterActionDivider-');
       if (isDivider) divider.style.setProperty('display', 'none', 'important');
-      
+
       let isVisible = false;
       toggleBtn.addEventListener('click', (e) => {
         e.preventDefault();
@@ -2902,11 +2912,8 @@
           toggleBtn.innerHTML = '🔍 Filtres <span style="font-size: 10px;">▼</span>';
         }
       });
-    } else {
-      const actionsBar = document.querySelector('[class*="actionsBar-"]') || document.querySelector('[class*="actionBar-"]');
-      if (actionsBar && toggleBtn.parentNode !== actionsBar) {
-        actionsBar.insertBefore(toggleBtn, actionsBar.firstChild);
-      }
+    } else if (actionsBar && toggleBtn.parentNode !== actionsBar) {
+      actionsBar.insertBefore(toggleBtn, actionsBar.firstChild);
     }
   }
 
@@ -2956,7 +2963,19 @@
     });
   }
 
+  let lastBlurredRoute = '';
   function ensureMobileNavbar() {
+    // Prevent unwanted soft keyboard popup from auto-focused navbar search inputs on route change
+    if (lastBlurredRoute !== location.pathname) {
+      lastBlurredRoute = location.pathname;
+      setTimeout(() => {
+        const active = document.activeElement;
+        if (active && active.tagName === 'INPUT' && active.closest('[class*="filterGroupToolsRight-"]')) {
+          active.blur();
+        }
+      }, 250);
+    }
+
     const hamburger = document.getElementById('sidemenu_hamburger_icon') || document.querySelector('[id*="hamburger"]');
     if (hamburger && !hamburger.hasAttribute('data-chrono-bound')) {
       hamburger.setAttribute('data-chrono-bound', 'true');
@@ -3010,9 +3029,20 @@
     } catch(e) {}
   }
 
+  function stripInternalBlankTargets() {
+    const links = document.querySelectorAll('a[target="_blank"]');
+    for (const link of links) {
+      const href = link.getAttribute('href') || '';
+      if (href.startsWith('/') || href.includes('cross.chronodiali.ma') || href.includes('shipsy.io')) {
+        link.removeAttribute('target');
+      }
+    }
+  }
+
   // ── Debounced observer to ensure buttery-smooth 60 FPS scrolling on tables ──
   let debounceTimer = null;
   function runDomEnhancements() {
+    stripInternalBlankTargets();
     attachScannerDelegation(document);
     hookScannerButtons(document.body);
     checkReconciliationToast();
@@ -3861,7 +3891,7 @@
     return Object.values(riderMap);
   }
 
-  // ── Global Internal Link Interceptor (Prevent blank target tab break) ─
+  // ── Global Internal Link & Trip Row Tap Interceptor (Prevent blank target break & expand touch target) ─
   document.addEventListener('click', (e) => {
     const link = e.target.closest('a');
     if (link) {
@@ -3869,6 +3899,42 @@
       if (href.startsWith('/') || href.includes('cross.chronodiali.ma') || href.includes('shipsy.io')) {
         if (link.getAttribute('target') === '_blank') {
           link.removeAttribute('target');
+        }
+      }
+      return;
+    }
+
+    // Ignore clicks on buttons, inputs, checkboxes, dropdown triggers, or icons
+    if (e.target.closest('button, input, label, select, .ant-checkbox-wrapper, .ant-dropdown-trigger, [role="button"], .anticon')) {
+      return;
+    }
+
+    // Expand tap target on Trip Manager / Consignments table rows so tapping the cell/row opens details
+    const cell = e.target.closest('td.ant-table-cell');
+    if (cell) {
+      const cellLink = cell.querySelector('a[href*="/trip/details/"], a[href*="/ops/details/"], a[href*="/reconciliation/"]');
+      if (cellLink) {
+        const href = cellLink.getAttribute('href');
+        if (href) {
+          cellLink.removeAttribute('target');
+          e.preventDefault();
+          e.stopPropagation();
+          cellLink.click();
+          return;
+        }
+      }
+
+      if (location.pathname.includes('/ops/retail/trip-manager')) {
+        const row = cell.closest('tr');
+        const rowTripLink = row ? row.querySelector('a[href*="/trip/details/"]') : null;
+        if (rowTripLink) {
+          const href = rowTripLink.getAttribute('href');
+          if (href && !href.endsWith('undefined')) {
+            rowTripLink.removeAttribute('target');
+            e.preventDefault();
+            e.stopPropagation();
+            rowTripLink.click();
+          }
         }
       }
     }

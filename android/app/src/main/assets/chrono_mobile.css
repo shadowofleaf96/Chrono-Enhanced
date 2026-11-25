@@ -176,16 +176,16 @@ header,
 
 /* Constrain search box inside navbar so it doesn't blow out width */
 [class*="filterGroupToolsRight-"] [class*="toolContainer-"] .ant-select[class*="selectStyle"] {
-  width: 90px !important;
-  min-width: 70px !important;
-  max-width: 100px !important;
+  width: 82px !important;
+  min-width: 68px !important;
+  max-width: 92px !important;
 }
 
 [class*="filterGroupToolsRight-"] [class*="toolContainer-"] .ant-input-search[class*="searchStyle"],
 [class*="filterGroupToolsRight-"] [class*="toolContainer-"] .ant-input-group-wrapper {
-  width: 140px !important;
-  min-width: 90px !important;
-  max-width: 150px !important;
+  width: 118px !important;
+  min-width: 88px !important;
+  max-width: 130px !important;
 }
 
 [class*="filterGroupToolsRight-"] [class*="toolContainer-"] input {
@@ -247,10 +247,28 @@ header,
   height: 28px !important;
   min-height: 28px !important;
   padding: 2px 6px !important;
-  max-width: 160px !important;
+  max-width: 170px !important;
   display: inline-flex !important;
   align-items: center !important;
   color: #111827 !important;
+}
+
+[class*="navbarDateFilter-"] .ant-picker-range {
+  min-width: 210px !important;
+  max-width: 240px !important;
+  width: auto !important;
+}
+
+.ant-picker:not(.ant-picker-range),
+[class*="filterGroupToolsRight-"] .ant-picker:not(.ant-picker-range) {
+  min-width: 124px !important;
+  max-width: none !important;
+  flex-shrink: 0 !important;
+}
+
+.ant-picker:not(.ant-picker-range) .ant-picker-input {
+  width: auto !important;
+  min-width: 88px !important;
 }
 
 [class*="filterGroupToolsRight-"] .ant-picker input,
@@ -259,7 +277,20 @@ header,
   font-size: 11px !important;
   font-weight: 600 !important;
   text-align: center !important;
-  max-width: 60px !important;
+  max-width: 76px !important;
+}
+
+[class*="navbarDateFilter-"] .ant-picker-range input {
+  max-width: 86px !important;
+  min-width: 72px !important;
+  width: 78px !important;
+}
+
+.ant-picker:not(.ant-picker-range) input,
+.ant-picker:not(.ant-picker-range) .ant-picker-input > input {
+  max-width: 100px !important;
+  min-width: 84px !important;
+  width: 88px !important;
 }
 
 [class*="filterGroupToolsRight-"] .ant-picker-separator {
@@ -301,10 +332,11 @@ div:has(> [class*="tabDataContainer-"]),
 [class*="container-"] {
   display: flex !important;
   flex-direction: column !important;
+  justify-content: flex-start !important;
   flex: 1 1 auto !important;
   width: 100vw !important;
   max-width: 100vw !important;
-  height: 100% !important;
+  height: auto !important;
   min-height: 0 !important;
 }
 
@@ -337,10 +369,12 @@ div[class*="tabDataContainer-"] {
   display: flex !important;
   flex-direction: row !important;
   align-items: center !important;
-  justify-content: space-between !important;
-  width: 100vw !important;
-  max-width: 100vw !important;
+  justify-content: flex-start !important;
+  width: 100% !important;
+  max-width: 100% !important;
   height: auto !important;
+  background: #ffffff !important;
+  border-bottom: 1px solid #e2e8f0 !important;
   touch-action: pan-x pan-y !important;
 }
 
@@ -348,7 +382,7 @@ div[class*="tabDataContainer-"] {
 [class*="tabsContainer-"] .ant-tabs-nav-wrap {
   flex: 1 1 auto !important;
   min-width: 0 !important;
-  width: calc(100% - 100px) !important;
+  width: 100% !important;
   display: flex !important;
   flex-direction: row !important;
   flex-wrap: nowrap !important;
@@ -356,11 +390,34 @@ div[class*="tabDataContainer-"] {
   overflow-y: hidden !important;
   -webkit-overflow-scrolling: touch !important;
   touch-action: pan-x pan-y !important;
-  max-width: 100vw !important;
+  max-width: 100% !important;
   padding: 4px 6px !important;
-  background: #ffffff !important;
-  border-bottom: 1px solid #e8e8e8 !important;
+  background: transparent !important;
+  border-bottom: none !important;
   scrollbar-width: none !important;
+}
+
+.ant-tabs-nav-wrap-ping-left::before,
+.ant-tabs-nav-wrap-ping-right::after {
+  display: none !important;
+  opacity: 0 !important;
+}
+
+.ant-tabs-ink-bar {
+  display: none !important;
+}
+
+.ant-tabs-nav-operations {
+  display: none !important;
+}
+
+/* Hide desktop-only density/font size settings bar on mobile */
+[class*="setFontSize"],
+div:has(> [class*="setFontSize"]) {
+  display: none !important;
+  height: 0 !important;
+  margin: 0 !important;
+  padding: 0 !important;
 }
 
 .ant-tabs-nav-list {
@@ -373,7 +430,7 @@ div[class*="tabDataContainer-"] {
 .ant-tabs-extra-content {
   flex: 0 0 auto !important;
   width: auto !important;
-  max-width: 110px !important;
+  max-width: none !important;
   display: flex !important;
   align-items: center !important;
   justify-content: center !important;
@@ -569,29 +626,55 @@ button:has(span:contains("Geolocation")) {
   font-size: 13px !important;
 }
 
-/* ── 5. Action Buttons Bar (Print Label, Inscan, Outscan...) ────────────────── */
+/* ── 5. Action Buttons Bar (Single horizontally swipeable row with clean spacing) ─ */
 [class*="actionsBar-"],
 [class*="actionBar-"],
+[class*="rightItems-"],
 div:not(header *):not([class*="navbar-"] *):not([class*="filterGroupToolsRight-"] *):not([class*="filterBarWrapper-"]):not([class*="filterRow-"] *):not([class*="settlementContainer-"]):not([class*="settlementContainer-"] *):not([class*="settleBalance-"]):not([class*="settleBalance-"] *):not([class*="tabsCardsContainer-"]):not([class*="tabsCardsContainer-"] *):not(.chrono-settlement-actions-form):not(.chrono-settlement-actions-form *):has(> button.ant-btn[class*="middleButton-"]:not([class*="enhanceGeocode"])),
 [class*="searchUploadDiv-"],
 [class*="actionBar"],
 [class*="actionButtons"],
 [class*="buttonGroup"] {
   display: flex !important;
+  flex-direction: row !important;
   flex-wrap: nowrap !important;
   overflow-x: auto !important;
+  overflow-y: hidden !important;
   -webkit-overflow-scrolling: touch !important;
-  touch-action: pan-x !important;
-  gap: 6px !important;
-  padding: 6px 8px !important;
+  touch-action: pan-x pan-y !important;
+  gap: 8px !important;
+  padding: 6px 10px !important;
   width: 100% !important;
   max-width: 100vw !important;
   margin: 0 !important;
   justify-content: flex-start !important;
+  align-items: center !important;
   box-sizing: border-box !important;
   height: auto !important;
-  max-height: 52px !important;
+  max-height: 54px !important;
   flex: 0 0 auto !important;
+}
+
+[class*="rightItems-"] > *,
+[class*="actionsBar-"] > *,
+[class*="actionBar-"] > * {
+  flex-shrink: 0 !important;
+  white-space: nowrap !important;
+}
+
+[class*="rightItems-"] .ant-pagination,
+[class*="actionsBar-"] .ant-pagination {
+  display: inline-flex !important;
+  flex-direction: row !important;
+  flex-wrap: nowrap !important;
+  align-items: center !important;
+  gap: 4px !important;
+}
+
+[class*="rightItems-"]::-webkit-scrollbar,
+[class*="actionsBar-"]::-webkit-scrollbar,
+[class*="actionBar-"]::-webkit-scrollbar {
+  display: none !important;
 }
 
 /* ── 5b. Filter Dropdowns, Menus & Popovers (Never cut off or hidden behind tables) ── */
@@ -645,14 +728,53 @@ div:has(> [class*="filter-menu"]) {
 }
 
 /* Ensure View Rider Transactions and action buttons stay in background layer under dropdowns */
+[class*="formContainer-"] [class*="actionButtons-"] .ant-form-item-control-input-content:has(.chrono-ext-verify-btn) {
+  display: flex !important;
+  flex-wrap: wrap !important;
+  gap: 8px !important;
+  align-items: center !important;
+}
+
+.chrono-ext-verify-btn,
+.chrono-ext-recon-settlements-btn,
+[class*="formContainer-"] [class*="actionButtons-"] .ant-btn-link {
+  min-height: 36px !important;
+  padding: 0 12px !important;
+  border-radius: 8px !important;
+  background: #f8fafc !important;
+  border: 1px solid #e2e8f0 !important;
+  font-weight: 600 !important;
+}
+
+.chrono-ext-recon-settlements-btn {
+  background: #f0fdf4 !important;
+  border-color: #bbf7d0 !important;
+  color: #15803d !important;
+}
+
 a[href*="transactionsHistory"],
 a:has(> [class*="transaction"]),
 div:has(> a[href*="transactionsHistory"]),
+[class*="manageTransactions-"],
 [class*="transactionLink-"],
 .chrono-ext-recon-settlements-btn,
 .chrono-ext-verify-btn {
   position: relative !important;
   z-index: 1 !important;
+}
+
+[class*="manageTransactions-"] {
+  display: inline-flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  white-space: nowrap !important;
+  width: auto !important;
+  font-size: 12px !important;
+  padding: 6px 10px !important;
+  margin: 4px 6px 4px 0 !important;
+  background: #f0f9ff !important;
+  border: 1px solid #bae6fd !important;
+  border-radius: 8px !important;
 }
 
 [class*="formContainer-"] .ant-form-item {
@@ -689,10 +811,19 @@ div:has(> a[href*="transactionsHistory"]),
 
 .ant-table-placeholder .ant-table-cell {
   text-align: center !important;
-  padding: 36px 16px !important;
+  padding: 36px 0 !important;
   color: #64748b !important;
   font-size: 13px !important;
   font-weight: 500 !important;
+}
+
+.ant-table-placeholder .ant-table-cell > * {
+  position: sticky !important;
+  left: 0 !important;
+  width: 100vw !important;
+  max-width: 100vw !important;
+  display: block !important;
+  text-align: center !important;
 }
 
 .ant-empty {
@@ -733,7 +864,7 @@ button.ant-btn[class*="middleButton-"],
 }
 
 /* ── 6. Table & Grid (Proper column sizes, zero blank space, smooth swipe, no freezing) ──── */
-/* Fixed columns: keep pinned on the left as a freeze pane on mobile */
+/* Fixed left columns pinned cleanly; unpin sticky right Actions so it never overlaps adjacent columns on narrow screens */
 .ant-table-cell-fix-left,
 .ant-table-cell-fix-left-last {
   position: sticky !important;
@@ -743,11 +874,19 @@ button.ant-btn[class*="middleButton-"],
 }
 .ant-table-thead th.ant-table-cell-fix-left,
 .ant-table-thead th.ant-table-cell-fix-left-last {
-  background: #fafafa !important;
+  background: #f8fafc !important;
   z-index: 4 !important;
 }
 .ant-table-cell-fix-left-last {
   box-shadow: 3px 0 6px -2px rgba(0, 0, 0, 0.12) !important;
+}
+.ant-table-cell-fix-right,
+.ant-table-cell-fix-right-first,
+.ant-table-thead th.ant-table-cell-fix-right,
+.ant-table-thead th.ant-table-cell-fix-right-first {
+  position: static !important;
+  right: auto !important;
+  box-shadow: none !important;
 }
 
 .ant-table-wrapper,
@@ -1019,7 +1158,7 @@ div:has(> .ant-pagination) {
   flex: 0 0 46vw !important;
   box-sizing: border-box !important;
   overflow-y: auto !important;
-  max-height: 80vh !important;
+  max-height: calc(100vh - 54px) !important;
   -webkit-overflow-scrolling: touch !important;
 }
 
@@ -1034,9 +1173,14 @@ div:has(> .ant-pagination) {
   flex: 0 0 54vw !important;
   box-sizing: border-box !important;
   overflow-y: auto !important;
-  max-height: 80vh !important;
+  max-height: calc(100vh - 54px) !important;
   -webkit-overflow-scrolling: touch !important;
   background: #141f2d !important;
+}
+
+.ant-drawer-content {
+  border-radius: 0 0 16px 16px !important;
+  overflow: hidden !important;
 }
 
 [class*="searchShortcut-"] {
@@ -1871,8 +2015,10 @@ html, body {
   margin-top: 8px !important;
 }
 
-.ant-modal .ant-table {
-  min-width: 320px !important;
+.ant-modal .ant-table,
+.ant-modal .ant-table table {
+  min-width: 0 !important;
+  width: 100% !important;
   font-size: 13px !important;
 }
 
@@ -1931,23 +2077,45 @@ div[class*="widget-visible"],
   padding: 2px 6px !important;
 }
 
-.chrono-ext-cn-cell {
+.chrono-ext-cn-td {
+  white-space: normal !important;
+  overflow: visible !important;
+  vertical-align: top !important;
+  padding: 6px !important;
+}
+
+.chrono-ext-cn-inner {
   display: flex !important;
   flex-direction: column !important;
   align-items: stretch !important;
-  gap: 2px !important;
+  gap: 4px !important;
   width: 100% !important;
-  padding: 4px 6px !important;
   box-sizing: border-box !important;
+}
+
+/* Make Trip & Consignment table links full-height tap targets */
+.ant-table-tbody td a[href*="/trip/details/"],
+.ant-table-tbody td a[href*="/ops/details/"] {
+  display: flex !important;
+  align-items: center !important;
+  width: 100% !important;
+  min-height: 44px !important;
+  padding: 6px 4px !important;
+  font-weight: 700 !important;
+  color: #0088ce !important;
+  text-decoration: none !important;
+  touch-action: manipulation !important;
+  cursor: pointer !important;
 }
 
 .chrono-cn-header {
   display: flex !important;
   justify-content: space-between !important;
   align-items: center !important;
+  flex-wrap: wrap !important;
   width: 100% !important;
   gap: 6px !important;
-  padding-bottom: 1px !important;
+  padding-bottom: 2px !important;
 }
 
 .chrono-cn-code {
@@ -1959,6 +2127,7 @@ div[class*="widget-visible"],
 
 .chrono-cn-badges {
   display: flex !important;
+  flex-wrap: wrap !important;
   align-items: center !important;
   gap: 4px !important;
   margin-left: auto !important;
@@ -1978,22 +2147,9 @@ div[class*="widget-visible"],
   background: #f8fafc !important;
   border: 1px solid #e2e8f0 !important;
   border-radius: 6px !important;
-  padding: 3px 6px !important;
+  padding: 6px 8px !important;
+  gap: 4px !important;
   box-sizing: border-box !important;
-}
-
-.chrono-ext-status-timeline.is-single-line {
-  padding: 3px 6px !important;
-}
-
-.chrono-ext-status-line {
-  display: flex !important;
-  align-items: center !important;
-  gap: 6px !important;
-  width: 100% !important;
-  font-size: 12px !important;
-  line-height: 1.25 !important;
-  overflow: hidden !important;
 }
 
 .chrono-ext-attempts-badge {
@@ -2020,84 +2176,6 @@ div[class*="widget-visible"],
   padding: 1px 6px !important;
 }
 
-.chrono-ext-log-dot {
-  display: inline-block !important;
-  width: 7px !important;
-  height: 7px !important;
-  min-width: 7px !important;
-  border-radius: 50% !important;
-  flex-shrink: 0 !important;
-  box-shadow: 0 0 0 1.5px rgba(255,255,255,0.9) !important;
-}
-
-.chrono-ext-log-status {
-  font-size: 12.5px !important;
-  font-weight: 700 !important;
-  color: #1e293b !important;
-  white-space: nowrap !important;
-  flex-shrink: 0 !important;
-}
-
-.chrono-ext-log-status.is-current {
-  color: #0f172a !important;
-}
-
-.chrono-ext-log-detail-inline {
-  font-size: 11px !important;
-  color: #64748b !important;
-  white-space: nowrap !important;
-  overflow: hidden !important;
-  text-overflow: ellipsis !important;
-  flex: 1 1 auto !important;
-  min-width: 0 !important;
-}
-
-.chrono-ext-log-time {
-  font-size: 10.5px !important;
-  font-weight: 600 !important;
-  color: #475569 !important;
-  background: #e2e8f0 !important;
-  padding: 1px 5px !important;
-  border-radius: 4px !important;
-  white-space: nowrap !important;
-  margin-left: auto !important;
-  flex-shrink: 0 !important;
-}
-
-.chrono-ext-history-btn {
-  background: #e2e8f0 !important;
-  color: #475569 !important;
-  border: 1px solid #cbd5e1 !important;
-  border-radius: 4px !important;
-  font-size: 10px !important;
-  font-weight: 700 !important;
-  padding: 1px 5px !important;
-  cursor: pointer !important;
-  flex-shrink: 0 !important;
-  line-height: 14px !important;
-}
-
-.chrono-ext-history-btn:hover {
-  background: #cbd5e1 !important;
-}
-
-.chrono-ext-history-dropdown {
-  margin-top: 4px !important;
-  padding-top: 4px !important;
-  border-top: 1px dashed #cbd5e1 !important;
-  display: flex !important;
-  flex-direction: column !important;
-  gap: 3px !important;
-}
-
-.chrono-ext-history-item {
-  display: flex !important;
-  align-items: center !important;
-  gap: 6px !important;
-  font-size: 11px !important;
-  color: #64748b !important;
-}
-
 .chrono-ext-log-entry {
   display: flex !important;
   align-items: flex-start !important;
@@ -2118,12 +2196,13 @@ div[class*="widget-visible"],
 
 .chrono-ext-log-dot {
   display: inline-block !important;
-  width: 10px !important;
-  height: 10px !important;
+  width: 9px !important;
+  height: 9px !important;
+  min-width: 9px !important;
   border-radius: 50% !important;
   margin-top: 4px !important;
   flex-shrink: 0 !important;
-  box-shadow: 0 0 0 2px rgba(255,255,255,0.8) !important;
+  box-shadow: 0 0 0 1.5px rgba(255,255,255,0.9) !important;
 }
 
 .chrono-ext-log-content {
@@ -2136,40 +2215,46 @@ div[class*="widget-visible"],
 .chrono-ext-log-title-row {
   display: flex !important;
   justify-content: space-between !important;
-  align-items: center !important;
+  align-items: flex-start !important;
   width: 100% !important;
-  gap: 8px !important;
+  gap: 6px !important;
 }
 
 .chrono-ext-log-status {
-  font-size: 13px !important;
+  font-size: 12.5px !important;
   font-weight: 600 !important;
-  color: #1e293b !important;
-  line-height: 1.3 !important;
+  color: #334155 !important;
+  line-height: 1.35 !important;
   white-space: normal !important;
   word-break: break-word !important;
+  overflow: visible !important;
 }
 
 .chrono-ext-log-status.is-current {
+  font-weight: 700 !important;
   color: #0f172a !important;
-  font-size: 13.5px !important;
+  font-size: 13px !important;
 }
 
 .chrono-ext-log-time {
-  font-size: 11px !important;
+  font-size: 10.5px !important;
   font-weight: 600 !important;
   color: #475569 !important;
   background: #e2e8f0 !important;
-  padding: 2px 6px !important;
+  padding: 1px 5px !important;
   border-radius: 4px !important;
   white-space: nowrap !important;
+  flex-shrink: 0 !important;
 }
 
 .chrono-ext-log-detail {
   font-size: 11.5px !important;
   color: #475569 !important;
-  margin-top: 3px !important;
+  margin-top: 2px !important;
   line-height: 1.35 !important;
+  white-space: normal !important;
+  word-break: break-word !important;
+  overflow: visible !important;
 }
 
 .chrono-ext-import-btn {
@@ -2401,29 +2486,48 @@ div[class*="widget-visible"],
   font-weight: 700 !important;
 }
 
-/* Trip Details & Consignment Details Tabs & Header Actions Wrapping */
-[class*="tableContainer-"] .ant-tabs-nav,
-.ant-tabs-top > .ant-tabs-nav,
-[class*="tabsCardsContainer-"] .ant-tabs-nav {
+/* Trip Details & Consignment Details Tabs & Header Actions */
+.ant-tabs-nav,
+[role="tablist"].ant-tabs-nav,
+[class*="tabsContainer-"] .ant-tabs-nav,
+.ant-tabs-top > .ant-tabs-nav {
   display: flex !important;
+  flex-direction: row !important;
+  align-items: center !important;
+  justify-content: flex-start !important;
+  width: 100% !important;
+  max-width: 100% !important;
+  background: #ffffff !important;
+  border-bottom: 1px solid #e2e8f0 !important;
+  box-sizing: border-box !important;
+  margin-bottom: 8px !important;
+  padding: 0 !important;
+}
+
+/* Stack tabs cleanly above extra content whenever extra content exists (Trip Manager Map Edit & Chosen Trip toolbar) */
+.ant-tabs-nav:has(.ant-tabs-extra-content),
+[class*="tableContainer-"] .ant-tabs-nav:has(.ant-tabs-extra-content) {
   flex-direction: column !important;
   align-items: stretch !important;
-  width: 100% !important;
-  margin-bottom: 8px !important;
 }
 
 .ant-tabs-nav-wrap {
+  flex: 1 1 auto !important;
+  min-width: 0 !important;
   width: 100% !important;
-  max-width: 100vw !important;
+  max-width: 100% !important;
   overflow-x: auto !important;
   -webkit-overflow-scrolling: touch !important;
-  padding-bottom: 4px !important;
+  padding: 4px 6px !important;
+  background: transparent !important;
+  border-bottom: none !important;
 }
 
 .ant-tabs-nav-list {
   display: flex !important;
   flex-wrap: nowrap !important;
   gap: 6px !important;
+  transform: none !important;
 }
 
 .ant-tabs-tab {
@@ -2438,21 +2542,295 @@ div[class*="widget-visible"],
 
 .ant-tabs-extra-content {
   width: 100% !important;
+  max-width: 100% !important;
+  display: flex !important;
+  flex-wrap: wrap !important;
+  align-items: center !important;
+  justify-content: flex-start !important;
+  gap: 8px !important;
+  padding: 4px 8px 6px 8px !important;
+  box-sizing: border-box !important;
+}
+
+.ant-tabs-extra-content:has(input) {
+  width: 100% !important;
   display: flex !important;
   flex-wrap: wrap !important;
   align-items: center !important;
   justify-content: space-between !important;
   gap: 8px !important;
-  margin-top: 6px !important;
-  padding: 2px 4px !important;
+  margin-top: 2px !important;
+  padding: 4px 8px 8px 8px !important;
 }
 
+.ant-tabs-extra-content:has(input) > div {
+  display: flex !important;
+  flex-wrap: wrap !important;
+  align-items: center !important;
+  justify-content: space-between !important;
+  gap: 8px !important;
+  width: 100% !important;
+}
+
+.ant-tabs-extra-content:has(input) .ant-input-affix-wrapper,
 .ant-tabs-extra-content input,
 .ant-tabs-extra-content .ant-input-search {
   max-width: 100% !important;
-  flex: 1 1 180px !important;
+  flex: 1 1 100% !important;
+  width: 100% !important;
+  margin-right: 0 !important;
   height: 38px !important;
   border-radius: 8px !important;
+}
+
+.ant-tabs-extra-content .ant-pagination,
+.ant-tabs-extra-content [class*="container-"]:has(.anticon-left, .anticon-right, .anticon-vertical-right),
+[class*="rightItems-"] [class*="container-"]:has(.anticon-left, .anticon-right, .anticon-vertical-right) {
+  display: inline-flex !important;
+  flex-direction: row !important;
+  flex-wrap: nowrap !important;
+  align-items: center !important;
+  width: auto !important;
+  max-width: none !important;
+  height: auto !important;
+  flex: 0 0 auto !important;
+  gap: 8px !important;
+  margin: 0 !important;
+}
+
+/* Reclaim top spacing above Chosen Trip KPI card */
+div:has(> [class*="itemsWrapper-"]) {
+  padding-top: 4px !important;
+  margin-top: 0 !important;
+}
+
+[class*="rowContainer-"]:has(> button):empty,
+div:has(> [class*="itemsWrapper-"]) > div:first-child:has(button[class*="secondaryButton-"]) {
+  margin-bottom: 4px !important;
+  padding: 0 8px !important;
+}
+
+/* ── 17. Consignment Details Sub-Tabs Responsive Engine ── */
+
+/* 1. Universal Table Container in Detail Sub-Tabs */
+[class*="tabDataContainer-"] .ant-table-wrapper,
+[class*="tabsCardsContainer-"] .ant-table-wrapper,
+[class*="tabDataContainer-"] .ant-spin-container,
+[class*="tabsCardsContainer-"] .ant-spin-container,
+[class*="tabDataContainer-"] .ant-table-container,
+[class*="tabsCardsContainer-"] .ant-table-container {
+  width: 100% !important;
+  max-width: 100% !important;
+  overflow-x: auto !important;
+  -webkit-overflow-scrolling: touch !important;
+  border-radius: 10px !important;
+}
+
+/* Wrap tables in card container with soft border */
+[class*="tabDataContainer-"] .ant-table-wrapper,
+[class*="tabsCardsContainer-"] .ant-table-wrapper {
+  background: #ffffff !important;
+  border: 1px solid #e2e8f0 !important;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05) !important;
+  margin-top: 8px !important;
+  margin-bottom: 12px !important;
+}
+
+[class*="tabDataContainer-"] .ant-table,
+[class*="tabsCardsContainer-"] .ant-table,
+[class*="tabDataContainer-"] .ant-table table,
+[class*="tabsCardsContainer-"] .ant-table table {
+  table-layout: auto !important;
+  width: max-content !important;
+  min-width: 100% !important;
+  font-size: 13px !important;
+}
+
+[class*="tabDataContainer-"] .ant-table col,
+[class*="tabsCardsContainer-"] .ant-table col {
+  width: auto !important;
+}
+
+/* Legible cells with nowrap so codes and values never split */
+[class*="tabDataContainer-"] .ant-table-thead th,
+[class*="tabDataContainer-"] .ant-table-thead th > div,
+[class*="tabsCardsContainer-"] .ant-table-thead th,
+[class*="tabsCardsContainer-"] .ant-table-thead th > div {
+  width: auto !important;
+  min-width: 90px !important;
+  max-width: none !important;
+  white-space: nowrap !important;
+  text-overflow: clip !important;
+  overflow: visible !important;
+  background: #f8fafc !important;
+  color: #475569 !important;
+  font-weight: 700 !important;
+  font-size: 12px !important;
+  text-transform: uppercase !important;
+  letter-spacing: 0.3px !important;
+  padding: 10px 12px !important;
+  border-bottom: 1px solid #e2e8f0 !important;
+}
+
+[class*="tabDataContainer-"] .ant-table-tbody td,
+[class*="tabDataContainer-"] .ant-table-tbody td > div,
+[class*="tabsCardsContainer-"] .ant-table-tbody td,
+[class*="tabsCardsContainer-"] .ant-table-tbody td > div {
+  width: auto !important;
+  white-space: nowrap !important;
+  text-overflow: clip !important;
+  overflow: visible !important;
+  padding: 10px 12px !important;
+  font-size: 13px !important;
+  color: #1e293b !important;
+  border-bottom: 1px solid #f1f5f9 !important;
+}
+
+/* Specific column minimum widths for Piece Details & Tracking (e.g. MRJN0035983081A) */
+[class*="tabDataContainer-"] .ant-table td:nth-child(2),
+[class*="tabDataContainer-"] .ant-table th:nth-child(2),
+[class*="tabDataContainer-"] .ant-table td:nth-child(2) > div,
+[class*="tabDataContainer-"] .ant-table th:nth-child(2) > div {
+  min-width: 180px !important;
+  font-weight: 600 !important;
+  color: #0088ce !important;
+}
+
+[class*="tabDataContainer-"] .ant-table td:nth-child(3),
+[class*="tabDataContainer-"] .ant-table th:nth-child(3),
+[class*="tabDataContainer-"] .ant-table td:nth-child(3) > div,
+[class*="tabDataContainer-"] .ant-table th:nth-child(3) > div {
+  min-width: 150px !important;
+}
+
+/* 2. Detail Page Action Bars (Custom view, Download/Export, etc.) */
+[class*="tabDataContainer-"] [class*="action"],
+[class*="tabDataContainer-"] [class*="buttonContainer"],
+[class*="tabDataContainer-"] [class*="toolsContainer"],
+[class*="tabDataContainer-"] > div:has(button),
+[class*="tabDataContainer-"] > div:has(.ant-btn) {
+  display: flex !important;
+  align-items: center !important;
+  justify-content: space-between !important;
+  gap: 8px !important;
+  margin-bottom: 8px !important;
+  padding: 2px 4px !important;
+}
+
+[class*="tabDataContainer-"] button,
+[class*="tabDataContainer-"] .ant-btn {
+  min-height: 38px !important;
+  border-radius: 8px !important;
+  font-size: 13px !important;
+  font-weight: 600 !important;
+  padding: 0 14px !important;
+  touch-action: manipulation !important;
+}
+
+/* 3. Consignment Logs Timeline Modernization */
+[class*="tabDataContainer-"] .ant-timeline {
+  padding: 12px 6px 12px 10px !important;
+}
+
+[class*="tabDataContainer-"] .ant-timeline-item {
+  padding-bottom: 18px !important;
+}
+
+[class*="tabDataContainer-"] .ant-timeline-item-head {
+  width: 12px !important;
+  height: 12px !important;
+  border-width: 2.5px !important;
+}
+
+[class*="tabDataContainer-"] .ant-timeline-item-content {
+  margin-left: 18px !important;
+  top: -4px !important;
+}
+
+[class*="tabDataContainer-"] .ant-timeline-item-content .ant-row {
+  display: flex !important;
+  flex-direction: column !important;
+  gap: 6px !important;
+  margin: 0 !important;
+}
+
+[class*="tabDataContainer-"] .ant-timeline-item-content .ant-col-6,
+[class*="tabDataContainer-"] .ant-timeline-item-content .ant-col-18,
+[class*="tabDataContainer-"] .ant-timeline-item-content .ant-col-24,
+[class*="tabDataContainer-"] .ant-timeline-item-content .ant-col {
+  width: 100% !important;
+  max-width: 100% !important;
+  flex: 0 0 100% !important;
+  padding: 0 !important;
+}
+
+/* Timestamp & event name on top of log card */
+[class*="tabDataContainer-"] [class*="eventTime-"] {
+  font-size: 12px !important;
+  font-weight: 700 !important;
+  color: #0088ce !important;
+  margin-bottom: 2px !important;
+  display: flex !important;
+  flex-wrap: wrap !important;
+  gap: 4px 8px !important;
+  align-items: center !important;
+}
+
+/* Log Details Card */
+[class*="tabDataContainer-"] .ant-collapse-item,
+[class*="tabDataContainer-"] [class*="timelineEvent-"],
+[class*="tabDataContainer-"] .ant-timeline-item-content [class*="card"] {
+  background: #ffffff !important;
+  border: 1px solid #e2e8f0 !important;
+  border-radius: 10px !important;
+  padding: 10px 14px !important;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.04) !important;
+  width: 100% !important;
+  box-sizing: border-box !important;
+}
+
+[class*="tabDataContainer-"] [class*="timelineEvent-"] {
+  display: flex !important;
+  flex-direction: column !important;
+  gap: 4px !important;
+}
+
+[class*="tabDataContainer-"] [class*="timelineEvent-"] > div {
+  width: 100% !important;
+}
+
+[class*="tabDataContainer-"] [class*="timelineEventHeader-"] {
+  font-weight: 700 !important;
+  color: #475569 !important;
+  font-size: 13px !important;
+}
+
+[class*="tabDataContainer-"] .ant-collapse-header {
+  padding: 6px 0 !important;
+}
+
+[class*="tabDataContainer-"] [class*="timelineEvent-"] p {
+  margin-bottom: 2px !important;
+  font-size: 13px !important;
+  line-height: 1.4 !important;
+  text-indent: 0 !important;
+  text-align: left !important;
+  padding-left: 0 !important;
+}
+
+/* 4. Empty State Enhancement */
+[class*="tabDataContainer-"] .ant-empty {
+  margin: 32px 0 !important;
+  padding: 16px !important;
+  background: #ffffff !important;
+  border-radius: 10px !important;
+  border: 1px dashed #cbd5e1 !important;
+}
+
+[class*="tabDataContainer-"] .ant-empty-description {
+  font-size: 13.5px !important;
+  color: #64748b !important;
+  font-weight: 500 !important;
 }
 
 
